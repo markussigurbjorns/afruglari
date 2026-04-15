@@ -13,7 +13,7 @@ use synth::{
 };
 pub use types::{
     RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, parse_render_mode,
-    render_mode_name,
+    render_mode_name, render_preset,
 };
 use wav::write_wav_stereo_i16;
 

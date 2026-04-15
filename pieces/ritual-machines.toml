@@ -43,59 +43,39 @@ end = 24
 
 [[voice_render]]
 voice = 0
-mode = "sub-machine"
-brightness = 0.62
+preset = "buried-engine"
 roughness = 0.80
-sustain = 3.20
-stereo_width = 0.45
 
 [[voice_render]]
 voice = 1
-mode = "glass-harmonics"
-brightness = 1.30
-roughness = 1.65
-sustain = 0.75
-stereo_width = 0.95
+preset = "glass-insects"
 
 [[voice_render]]
 voice = 2
-mode = "granular-dust"
-brightness = 1.55
+preset = "static-ash"
 roughness = 2.10
-sustain = 0.65
-stereo_width = 1.00
-drive = 1.45
 
 [[section_render]]
 section = "summon"
-brightness = 0.58
-roughness = 0.70
+preset = "distant-drone"
 sustain = 3.40
-stereo_width = 0.45
 
 [[section_render]]
 section = "mesh"
-brightness = 0.92
+preset = "organ-fog"
 roughness = 1.25
-sustain = 1.70
 
 [[section_render]]
 section = "fault"
-mode = "granular-dust"
+preset = "static-ash"
 brightness = 1.90
 roughness = 2.70
 sustain = 0.45
-stereo_width = 1.00
-drive = 1.80
 
 [[section_render]]
 section = "afterimage"
-mode = "drone"
-brightness = 0.50
-roughness = 0.60
+preset = "distant-drone"
 sustain = 4.00
-stereo_width = 0.55
-drive = 1.05
 
 [[constraint]]
 type = "exact-count"

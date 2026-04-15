@@ -282,7 +282,7 @@ fn config_parser_accepts_piece_and_render_sections() {
 
         [[section_render]]
         section = "rupture"
-        mode = "granular-dust"
+        preset = "static-ash"
         stereo_width = 0.9
         drive = 1.7
         brightness = 1.8
@@ -291,7 +291,7 @@ fn config_parser_accepts_piece_and_render_sections() {
 
         [[voice_render]]
         voice = 1
-        mode = "glass-harmonics"
+        preset = "glass-insects"
         stereo_width = 0.3
         drive = 1.1
         brightness = 0.9
@@ -319,9 +319,10 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.section_renders.len(), 1);
     assert_eq!(config.section_renders[0].section, "rupture");
     assert_eq!(
-        config.section_renders[0].mode,
-        Some(RenderMode::GranularDust)
+        config.section_renders[0].preset.as_deref(),
+        Some("static-ash")
     );
+    assert_eq!(config.section_renders[0].mode, None);
     assert_eq!(config.section_renders[0].stereo_width, Some(0.9));
     assert_eq!(config.section_renders[0].drive, Some(1.7));
     assert_eq!(config.section_renders[0].brightness, Some(1.8));
@@ -330,9 +331,10 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.voice_renders.len(), 1);
     assert_eq!(config.voice_renders[0].voice, 1);
     assert_eq!(
-        config.voice_renders[0].mode,
-        Some(RenderMode::GlassHarmonics)
+        config.voice_renders[0].preset.as_deref(),
+        Some("glass-insects")
     );
+    assert_eq!(config.voice_renders[0].mode, None);
     assert_eq!(config.voice_renders[0].stereo_width, Some(0.3));
     assert_eq!(config.voice_renders[0].drive, Some(1.1));
     assert_eq!(config.voice_renders[0].brightness, Some(0.9));
@@ -740,26 +742,19 @@ fn section_render_settings_generate_with_section_automation() {
 
         [[section_render]]
         section = "rupture"
-        mode = "broken-radio"
+        preset = "radio-wound"
         stereo_width = 0.9
-        drive = 1.8
-        brightness = 1.7
         roughness = 2.4
-        sustain = 0.5
 
         [[voice_render]]
         voice = 0
-        mode = "glass-harmonics"
-        brightness = 0.7
+        preset = "glass-insects"
         roughness = 1.1
-        sustain = 2.0
 
         [[voice_render]]
         voice = 1
-        mode = "metallic"
-        brightness = 1.4
+        preset = "metal-splinters"
         roughness = 1.8
-        sustain = 0.8
 
         [[constraint]]
         type = "exact-count"

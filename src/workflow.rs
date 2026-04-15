@@ -5,7 +5,7 @@ use crate::metadata::GenerationMetadata;
 use crate::presets::PiecePreset;
 use crate::render::{
     RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, parse_render_mode,
-    render_events_to_wav_with_automation, render_mode_name,
+    render_events_to_wav_with_automation, render_mode_name, render_preset,
 };
 use std::collections::BTreeMap;
 use std::fmt;
@@ -59,6 +59,7 @@ pub struct SectionConfig {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SectionRenderConfig {
     pub section: String,
+    pub preset: Option<String>,
     pub mode: Option<RenderMode>,
     pub stereo_width: Option<f32>,
     pub drive: Option<f32>,
@@ -70,6 +71,7 @@ pub struct SectionRenderConfig {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VoiceRenderConfig {
     pub voice: usize,
+    pub preset: Option<String>,
     pub mode: Option<RenderMode>,
     pub stereo_width: Option<f32>,
     pub drive: Option<f32>,
@@ -251,6 +253,7 @@ impl GenerationConfig {
                 let section_render = &mut config.section_renders[index];
                 match key.trim() {
                     "section" => section_render.section = parse_string(value)?,
+                    "preset" => section_render.preset = Some(parse_string(value)?),
                     "mode" | "render_mode" => {
                         section_render.mode =
                             Some(parse_render_mode(&parse_string(value)?).ok_or_else(|| {
@@ -284,6 +287,7 @@ impl GenerationConfig {
                 let voice_render = &mut config.voice_renders[index];
                 match key.trim() {
                     "voice" => voice_render.voice = parse_usize(value)?,
+                    "preset" => voice_render.preset = Some(parse_string(value)?),
                     "mode" | "render_mode" => {
                         voice_render.mode =
                             Some(parse_render_mode(&parse_string(value)?).ok_or_else(|| {
@@ -445,7 +449,7 @@ pub fn generate_one(config: &GenerationConfig) -> Result<GenerateResult, Generat
 
     let events = events_from_grid(&engine, &grid);
     ensure_parent_dir(&config.output)?;
-    let render_voices = resolve_render_voices(config);
+    let render_voices = resolve_render_voices(config)?;
     let render_sections = resolve_render_sections(config)?;
     render_events_to_wav_with_automation(
         &events,
@@ -521,13 +525,15 @@ pub fn generate_batch_from_config(
     Ok(results)
 }
 
-fn resolve_render_voices(config: &GenerationConfig) -> Vec<RenderVoice> {
+fn resolve_render_voices(config: &GenerationConfig) -> Result<Vec<RenderVoice>, GenerateError> {
     config
         .voice_renders
         .iter()
-        .map(|voice_render| RenderVoice {
-            voice: voice_render.voice,
-            overrides: voice_render_overrides(voice_render),
+        .map(|voice_render| {
+            Ok(RenderVoice {
+                voice: voice_render.voice,
+                overrides: voice_render_overrides(voice_render)?,
+            })
         })
         .collect()
 }
@@ -550,32 +556,79 @@ fn resolve_render_sections(config: &GenerationConfig) -> Result<Vec<RenderSectio
         sections.push(RenderSection {
             start_step: section.start,
             end_step: section.end,
-            overrides: section_render_overrides(section_render),
+            overrides: section_render_overrides(section_render)?,
         });
     }
 
     Ok(sections)
 }
 
-fn section_render_overrides(section_render: &SectionRenderConfig) -> RenderOverride {
-    RenderOverride {
-        mode: section_render.mode,
-        stereo_width: section_render.stereo_width,
-        drive: section_render.drive,
-        brightness: section_render.brightness,
-        roughness: section_render.roughness,
-        sustain: section_render.sustain,
-    }
+fn section_render_overrides(
+    section_render: &SectionRenderConfig,
+) -> Result<RenderOverride, GenerateError> {
+    let mut overrides = preset_override(section_render.preset.as_deref())?;
+    apply_explicit_render_fields(
+        &mut overrides,
+        section_render.mode,
+        section_render.stereo_width,
+        section_render.drive,
+        section_render.brightness,
+        section_render.roughness,
+        section_render.sustain,
+    );
+    Ok(overrides)
 }
 
-fn voice_render_overrides(voice_render: &VoiceRenderConfig) -> RenderOverride {
-    RenderOverride {
-        mode: voice_render.mode,
-        stereo_width: voice_render.stereo_width,
-        drive: voice_render.drive,
-        brightness: voice_render.brightness,
-        roughness: voice_render.roughness,
-        sustain: voice_render.sustain,
+fn voice_render_overrides(
+    voice_render: &VoiceRenderConfig,
+) -> Result<RenderOverride, GenerateError> {
+    let mut overrides = preset_override(voice_render.preset.as_deref())?;
+    apply_explicit_render_fields(
+        &mut overrides,
+        voice_render.mode,
+        voice_render.stereo_width,
+        voice_render.drive,
+        voice_render.brightness,
+        voice_render.roughness,
+        voice_render.sustain,
+    );
+    Ok(overrides)
+}
+
+fn preset_override(preset: Option<&str>) -> Result<RenderOverride, GenerateError> {
+    let Some(preset) = preset else {
+        return Ok(RenderOverride::default());
+    };
+    render_preset(preset)
+        .ok_or_else(|| GenerateError::Config(format!("unknown render preset '{preset}'")))
+}
+
+fn apply_explicit_render_fields(
+    overrides: &mut RenderOverride,
+    mode: Option<RenderMode>,
+    stereo_width: Option<f32>,
+    drive: Option<f32>,
+    brightness: Option<f32>,
+    roughness: Option<f32>,
+    sustain: Option<f32>,
+) {
+    if mode.is_some() {
+        overrides.mode = mode;
+    }
+    if stereo_width.is_some() {
+        overrides.stereo_width = stereo_width;
+    }
+    if drive.is_some() {
+        overrides.drive = drive;
+    }
+    if brightness.is_some() {
+        overrides.brightness = brightness;
+    }
+    if roughness.is_some() {
+        overrides.roughness = roughness;
+    }
+    if sustain.is_some() {
+        overrides.sustain = sustain;
     }
 }
 
@@ -588,12 +641,8 @@ fn voice_render_summaries(config: &GenerationConfig) -> Vec<String> {
                 "voice {}{}",
                 voice_render.voice,
                 render_override_summary(
-                    voice_render.mode,
-                    voice_render.stereo_width,
-                    voice_render.drive,
-                    voice_render.brightness,
-                    voice_render.roughness,
-                    voice_render.sustain,
+                    voice_render.preset.as_deref(),
+                    voice_render_overrides(voice_render).unwrap_or_default(),
                 )
             )
         })
@@ -609,43 +658,35 @@ fn section_render_summaries(config: &GenerationConfig) -> Vec<String> {
                 "section {}{}",
                 section_render.section,
                 render_override_summary(
-                    section_render.mode,
-                    section_render.stereo_width,
-                    section_render.drive,
-                    section_render.brightness,
-                    section_render.roughness,
-                    section_render.sustain,
+                    section_render.preset.as_deref(),
+                    section_render_overrides(section_render).unwrap_or_default(),
                 )
             )
         })
         .collect()
 }
 
-fn render_override_summary(
-    mode: Option<RenderMode>,
-    stereo_width: Option<f32>,
-    drive: Option<f32>,
-    brightness: Option<f32>,
-    roughness: Option<f32>,
-    sustain: Option<f32>,
-) -> String {
+fn render_override_summary(preset: Option<&str>, overrides: RenderOverride) -> String {
     let mut fields = Vec::new();
-    if let Some(mode) = mode {
+    if let Some(preset) = preset {
+        fields.push(format!("preset={preset}"));
+    }
+    if let Some(mode) = overrides.mode {
         fields.push(format!("mode={}", render_mode_name(mode)));
     }
-    if let Some(stereo_width) = stereo_width {
+    if let Some(stereo_width) = overrides.stereo_width {
         fields.push(format!("stereo_width={stereo_width:.2}"));
     }
-    if let Some(drive) = drive {
+    if let Some(drive) = overrides.drive {
         fields.push(format!("drive={drive:.2}"));
     }
-    if let Some(brightness) = brightness {
+    if let Some(brightness) = overrides.brightness {
         fields.push(format!("brightness={brightness:.2}"));
     }
-    if let Some(roughness) = roughness {
+    if let Some(roughness) = overrides.roughness {
         fields.push(format!("roughness={roughness:.2}"));
     }
-    if let Some(sustain) = sustain {
+    if let Some(sustain) = overrides.sustain {
         fields.push(format!("sustain={sustain:.2}"));
     }
 

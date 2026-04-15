@@ -76,6 +76,76 @@ pub fn render_mode_name(mode: RenderMode) -> &'static str {
     }
 }
 
+pub fn render_preset(name: &str) -> Option<RenderOverride> {
+    match name {
+        "buried-engine" => Some(RenderOverride {
+            mode: Some(RenderMode::SubMachine),
+            stereo_width: Some(0.42),
+            drive: Some(1.30),
+            brightness: Some(0.58),
+            roughness: Some(0.95),
+            sustain: Some(3.00),
+        }),
+        "glass-insects" => Some(RenderOverride {
+            mode: Some(RenderMode::GlassHarmonics),
+            stereo_width: Some(0.95),
+            drive: Some(1.18),
+            brightness: Some(1.45),
+            roughness: Some(1.70),
+            sustain: Some(0.72),
+        }),
+        "static-ash" => Some(RenderOverride {
+            mode: Some(RenderMode::GranularDust),
+            stereo_width: Some(1.00),
+            drive: Some(1.45),
+            brightness: Some(1.55),
+            roughness: Some(2.25),
+            sustain: Some(0.65),
+        }),
+        "radio-wound" => Some(RenderOverride {
+            mode: Some(RenderMode::BrokenRadio),
+            stereo_width: Some(1.00),
+            drive: Some(1.60),
+            brightness: Some(1.45),
+            roughness: Some(2.10),
+            sustain: Some(0.55),
+        }),
+        "organ-fog" => Some(RenderOverride {
+            mode: Some(RenderMode::NoiseOrgan),
+            stereo_width: Some(0.72),
+            drive: Some(1.15),
+            brightness: Some(0.82),
+            roughness: Some(1.05),
+            sustain: Some(2.15),
+        }),
+        "metal-splinters" => Some(RenderOverride {
+            mode: Some(RenderMode::Metallic),
+            stereo_width: Some(0.92),
+            drive: Some(1.22),
+            brightness: Some(1.28),
+            roughness: Some(1.65),
+            sustain: Some(0.80),
+        }),
+        "low-ritual" => Some(RenderOverride {
+            mode: Some(RenderMode::SubMachine),
+            stereo_width: Some(0.55),
+            drive: Some(1.20),
+            brightness: Some(0.72),
+            roughness: Some(0.85),
+            sustain: Some(2.40),
+        }),
+        "distant-drone" => Some(RenderOverride {
+            mode: Some(RenderMode::Drone),
+            stereo_width: Some(0.58),
+            drive: Some(1.05),
+            brightness: Some(0.52),
+            roughness: Some(0.58),
+            sustain: Some(4.00),
+        }),
+        _ => None,
+    }
+}
+
 impl Default for RenderConfig {
     fn default() -> Self {
         Self {

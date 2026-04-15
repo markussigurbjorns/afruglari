@@ -258,28 +258,32 @@ You can also give each voice its own sound role:
 ```toml
 [[voice_render]]
 voice = 0
-mode = "noise-organ"
-brightness = 0.78
-roughness = 1.10
-sustain = 2.10
-stereo_width = 0.35
+preset = "buried-engine"
 
 [[voice_render]]
 voice = 1
-mode = "metallic"
-brightness = 1.20
-roughness = 1.55
-sustain = 0.85
-stereo_width = 0.95
+preset = "glass-insects"
 
 [[voice_render]]
 voice = 2
-mode = "drone"
-brightness = 0.90
-roughness = 0.90
-sustain = 2.60
-stereo_width = 0.70
+preset = "static-ash"
+roughness = 2.40
 ```
+
+Available presets:
+
+```text
+buried-engine
+glass-insects
+static-ash
+radio-wound
+organ-fog
+metal-splinters
+low-ritual
+distant-drone
+```
+
+Preset fields can be overridden locally. `preset = "static-ash"` plus `roughness = 2.40` keeps the preset sound but makes it harsher.
 
 Render settings are layered in this order:
 

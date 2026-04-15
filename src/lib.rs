@@ -18,7 +18,7 @@ pub use presets::{PiecePreset, example_piece, piece_from_preset, preset_names};
 pub use render::{
     RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, parse_render_mode,
     render_events_to_wav, render_events_to_wav_with_automation, render_events_to_wav_with_sections,
-    render_mode_name,
+    render_mode_name, render_preset,
 };
 pub use workflow::{
     ConstraintConfig, GenerateError, GenerateResult, GenerationConfig, PieceConfig, SectionConfig,
