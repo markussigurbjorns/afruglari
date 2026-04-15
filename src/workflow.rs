@@ -5,7 +5,10 @@ use crate::constraints::{
 use crate::csp::{Engine, Value, solve_with_seed};
 use crate::grid::{Event, Grid, Param, events_from_grid};
 use crate::presets::{PiecePreset, piece_from_preset};
-use crate::render::{RenderConfig, RenderMode, render_events_to_wav};
+use crate::render::{
+    RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice,
+    render_events_to_wav_with_automation,
+};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
@@ -17,6 +20,8 @@ pub struct GenerationConfig {
     pub preset: PiecePreset,
     pub piece: Option<PieceConfig>,
     pub sections: Vec<SectionConfig>,
+    pub section_renders: Vec<SectionRenderConfig>,
+    pub voice_renders: Vec<VoiceRenderConfig>,
     pub constraints: Vec<ConstraintConfig>,
     pub seed: u64,
     pub output: PathBuf,
@@ -51,6 +56,28 @@ pub struct SectionConfig {
     pub name: String,
     pub start: usize,
     pub end: usize,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SectionRenderConfig {
+    pub section: String,
+    pub mode: Option<RenderMode>,
+    pub stereo_width: Option<f32>,
+    pub drive: Option<f32>,
+    pub brightness: Option<f32>,
+    pub roughness: Option<f32>,
+    pub sustain: Option<f32>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct VoiceRenderConfig {
+    pub voice: usize,
+    pub mode: Option<RenderMode>,
+    pub stereo_width: Option<f32>,
+    pub drive: Option<f32>,
+    pub brightness: Option<f32>,
+    pub roughness: Option<f32>,
+    pub sustain: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -91,6 +118,8 @@ impl Default for GenerationConfig {
             preset,
             piece: None,
             sections: Vec::new(),
+            section_renders: Vec::new(),
+            voice_renders: Vec::new(),
             constraints: Vec::new(),
             seed,
             output: default_output_path(preset, seed),
@@ -111,6 +140,8 @@ impl GenerationConfig {
         let mut section = String::new();
         let mut current_constraint = None;
         let mut current_section = None;
+        let mut current_section_render = None;
+        let mut current_voice_render = None;
 
         for (line_index, raw_line) in source.lines().enumerate() {
             let without_comment = raw_line.split_once('#').map_or(raw_line, |(left, _)| left);
@@ -126,6 +157,8 @@ impl GenerationConfig {
                         config.constraints.push(ConstraintConfig::new());
                         current_constraint = Some(config.constraints.len() - 1);
                         current_section = None;
+                        current_section_render = None;
+                        current_voice_render = None;
                     }
                     "section" => {
                         config.sections.push(SectionConfig {
@@ -135,6 +168,22 @@ impl GenerationConfig {
                         });
                         current_section = Some(config.sections.len() - 1);
                         current_constraint = None;
+                        current_section_render = None;
+                        current_voice_render = None;
+                    }
+                    "section_render" => {
+                        config.section_renders.push(SectionRenderConfig::default());
+                        current_section_render = Some(config.section_renders.len() - 1);
+                        current_constraint = None;
+                        current_section = None;
+                        current_voice_render = None;
+                    }
+                    "voice_render" => {
+                        config.voice_renders.push(VoiceRenderConfig::default());
+                        current_voice_render = Some(config.voice_renders.len() - 1);
+                        current_constraint = None;
+                        current_section = None;
+                        current_section_render = None;
                     }
                     _ => {
                         return Err(GenerateError::Config(format!(
@@ -149,6 +198,8 @@ impl GenerationConfig {
                 section = line[1..line.len() - 1].trim().to_string();
                 current_constraint = None;
                 current_section = None;
+                current_section_render = None;
+                current_voice_render = None;
                 continue;
             }
 
@@ -192,6 +243,72 @@ impl GenerationConfig {
                     other => {
                         return Err(GenerateError::Config(format!(
                             "unknown section key '{other}'"
+                        )));
+                    }
+                }
+                continue;
+            }
+
+            if section == "section_render" {
+                let Some(index) = current_section_render else {
+                    return Err(GenerateError::Config(format!(
+                        "line {} uses [section_render]; use [[section_render]]",
+                        line_index + 1
+                    )));
+                };
+                let section_render = &mut config.section_renders[index];
+                match key.trim() {
+                    "section" => section_render.section = parse_string(value)?,
+                    "mode" | "render_mode" => {
+                        section_render.mode =
+                            Some(parse_render_mode(&parse_string(value)?).ok_or_else(|| {
+                                GenerateError::Config(format!(
+                                    "unknown render mode '{}'",
+                                    parse_string(value).unwrap_or_default()
+                                ))
+                            })?);
+                    }
+                    "stereo_width" => section_render.stereo_width = Some(parse_f32(value)?),
+                    "drive" => section_render.drive = Some(parse_f32(value)?),
+                    "brightness" => section_render.brightness = Some(parse_f32(value)?),
+                    "roughness" => section_render.roughness = Some(parse_f32(value)?),
+                    "sustain" => section_render.sustain = Some(parse_f32(value)?),
+                    other => {
+                        return Err(GenerateError::Config(format!(
+                            "unknown section_render key '{other}'"
+                        )));
+                    }
+                }
+                continue;
+            }
+
+            if section == "voice_render" {
+                let Some(index) = current_voice_render else {
+                    return Err(GenerateError::Config(format!(
+                        "line {} uses [voice_render]; use [[voice_render]]",
+                        line_index + 1
+                    )));
+                };
+                let voice_render = &mut config.voice_renders[index];
+                match key.trim() {
+                    "voice" => voice_render.voice = parse_usize(value)?,
+                    "mode" | "render_mode" => {
+                        voice_render.mode =
+                            Some(parse_render_mode(&parse_string(value)?).ok_or_else(|| {
+                                GenerateError::Config(format!(
+                                    "unknown render mode '{}'",
+                                    parse_string(value).unwrap_or_default()
+                                ))
+                            })?);
+                    }
+                    "stereo_width" => voice_render.stereo_width = Some(parse_f32(value)?),
+                    "drive" => voice_render.drive = Some(parse_f32(value)?),
+                    "brightness" => voice_render.brightness = Some(parse_f32(value)?),
+                    "roughness" => voice_render.roughness = Some(parse_f32(value)?),
+                    "sustain" => voice_render.sustain = Some(parse_f32(value)?),
+                    other => {
+                        return Err(GenerateError::Config(format!(
+                            "unknown voice_render key '{other}'"
                         )));
                     }
                 }
@@ -262,6 +379,15 @@ impl GenerationConfig {
                 "render.drive" | "drive" => {
                     config.render.drive = parse_f32(value)?;
                 }
+                "render.brightness" | "brightness" => {
+                    config.render.brightness = parse_f32(value)?;
+                }
+                "render.roughness" | "roughness" => {
+                    config.render.roughness = parse_f32(value)?;
+                }
+                "render.sustain" | "sustain" => {
+                    config.render.sustain = parse_f32(value)?;
+                }
                 other => {
                     return Err(GenerateError::Config(format!(
                         "unknown config key '{other}'"
@@ -288,6 +414,10 @@ pub struct GenerationMetadata {
     pub events: usize,
     pub collisions: usize,
     pub voice_density: Vec<usize>,
+    pub voice_render_count: usize,
+    pub section_render_count: usize,
+    pub voice_renders: Vec<String>,
+    pub section_renders: Vec<String>,
 }
 
 impl GenerationMetadata {
@@ -302,15 +432,21 @@ impl GenerationMetadata {
             .map(usize::to_string)
             .collect::<Vec<_>>()
             .join(", ");
+        let voice_renders = json_string_array(&self.voice_renders);
+        let section_renders = json_string_array(&self.section_renders);
         format!(
-            "{{\n  \"preset\": \"{}\",\n  \"seed\": {},\n  \"render_mode\": \"{}\",\n  \"output\": \"{}\",\n  \"events\": {},\n  \"collisions\": {},\n  \"voice_density\": [{}]\n}}\n",
+            "{{\n  \"preset\": \"{}\",\n  \"seed\": {},\n  \"render_mode\": \"{}\",\n  \"output\": \"{}\",\n  \"events\": {},\n  \"collisions\": {},\n  \"voice_density\": [{}],\n  \"voice_render_count\": {},\n  \"section_render_count\": {},\n  \"voice_renders\": {},\n  \"section_renders\": {}\n}}\n",
             escape_json(&self.piece),
             self.seed,
             render_mode_name(self.render_mode),
             escape_json(&self.output.display().to_string()),
             self.events,
             self.collisions,
-            densities
+            densities,
+            self.voice_render_count,
+            self.section_render_count,
+            voice_renders,
+            section_renders
         )
     }
 
@@ -323,6 +459,13 @@ impl GenerationMetadata {
         let events = json_usize(source, "events")?;
         let collisions = json_usize(source, "collisions")?;
         let voice_density = json_usize_array(source, "voice_density")?;
+        let voice_render_count = json_optional_usize(source, "voice_render_count")?.unwrap_or(0);
+        let section_render_count =
+            json_optional_usize(source, "section_render_count")?.unwrap_or(0);
+        let voice_renders =
+            json_optional_string_array(source, "voice_renders")?.unwrap_or_default();
+        let section_renders =
+            json_optional_string_array(source, "section_renders")?.unwrap_or_default();
         let preset = PiecePreset::parse(&piece).unwrap_or(PiecePreset::Example);
 
         Ok(Self {
@@ -334,6 +477,10 @@ impl GenerationMetadata {
             events,
             collisions,
             voice_density,
+            voice_render_count,
+            section_render_count,
+            voice_renders,
+            section_renders,
         })
     }
 }
@@ -402,7 +549,15 @@ pub fn generate_one(config: &GenerationConfig) -> Result<GenerateResult, Generat
 
     let events = events_from_grid(&engine, &grid);
     ensure_parent_dir(&config.output)?;
-    render_events_to_wav(&events, &config.output, config.render)?;
+    let render_voices = resolve_render_voices(config);
+    let render_sections = resolve_render_sections(config)?;
+    render_events_to_wav_with_automation(
+        &events,
+        &config.output,
+        config.render,
+        &render_voices,
+        &render_sections,
+    )?;
 
     let metadata = metadata_for_events(config, &events);
     let metadata_path = metadata.json_path();
@@ -430,6 +585,8 @@ pub fn generate_batch(
             preset,
             piece: None,
             sections: Vec::new(),
+            section_renders: Vec::new(),
+            voice_renders: Vec::new(),
             constraints: Vec::new(),
             seed,
             output,
@@ -439,6 +596,168 @@ pub fn generate_batch(
     }
 
     Ok(results)
+}
+
+pub fn generate_batch_from_config(
+    path: impl AsRef<Path>,
+    count: usize,
+    output_dir: impl AsRef<Path>,
+) -> Result<Vec<GenerateResult>, GenerateError> {
+    let base_config = GenerationConfig::from_file(path.as_ref())?;
+    let output_dir = output_dir.as_ref();
+    fs::create_dir_all(output_dir)?;
+
+    let stem = path
+        .as_ref()
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or_else(|| piece_name(&base_config));
+
+    let mut results = Vec::with_capacity(count);
+    for offset in 0..count as u64 {
+        let seed = base_config.seed + offset;
+        let mut config = base_config.clone();
+        config.seed = seed;
+        config.output = output_dir.join(format!("{stem}-seed-{seed:03}.wav"));
+        results.push(generate_one(&config)?);
+    }
+
+    Ok(results)
+}
+
+fn resolve_render_voices(config: &GenerationConfig) -> Vec<RenderVoice> {
+    config
+        .voice_renders
+        .iter()
+        .map(|voice_render| RenderVoice {
+            voice: voice_render.voice,
+            overrides: voice_render_overrides(voice_render),
+        })
+        .collect()
+}
+
+fn resolve_render_sections(config: &GenerationConfig) -> Result<Vec<RenderSection>, GenerateError> {
+    let mut sections = Vec::with_capacity(config.section_renders.len());
+
+    for section_render in &config.section_renders {
+        let section = config
+            .sections
+            .iter()
+            .find(|section| section.name == section_render.section)
+            .ok_or_else(|| {
+                GenerateError::Config(format!(
+                    "section_render references unknown section '{}'",
+                    section_render.section
+                ))
+            })?;
+
+        sections.push(RenderSection {
+            start_step: section.start,
+            end_step: section.end,
+            overrides: section_render_overrides(section_render),
+        });
+    }
+
+    Ok(sections)
+}
+
+fn section_render_overrides(section_render: &SectionRenderConfig) -> RenderOverride {
+    RenderOverride {
+        mode: section_render.mode,
+        stereo_width: section_render.stereo_width,
+        drive: section_render.drive,
+        brightness: section_render.brightness,
+        roughness: section_render.roughness,
+        sustain: section_render.sustain,
+    }
+}
+
+fn voice_render_overrides(voice_render: &VoiceRenderConfig) -> RenderOverride {
+    RenderOverride {
+        mode: voice_render.mode,
+        stereo_width: voice_render.stereo_width,
+        drive: voice_render.drive,
+        brightness: voice_render.brightness,
+        roughness: voice_render.roughness,
+        sustain: voice_render.sustain,
+    }
+}
+
+fn voice_render_summaries(config: &GenerationConfig) -> Vec<String> {
+    config
+        .voice_renders
+        .iter()
+        .map(|voice_render| {
+            format!(
+                "voice {}{}",
+                voice_render.voice,
+                render_override_summary(
+                    voice_render.mode,
+                    voice_render.stereo_width,
+                    voice_render.drive,
+                    voice_render.brightness,
+                    voice_render.roughness,
+                    voice_render.sustain,
+                )
+            )
+        })
+        .collect()
+}
+
+fn section_render_summaries(config: &GenerationConfig) -> Vec<String> {
+    config
+        .section_renders
+        .iter()
+        .map(|section_render| {
+            format!(
+                "section {}{}",
+                section_render.section,
+                render_override_summary(
+                    section_render.mode,
+                    section_render.stereo_width,
+                    section_render.drive,
+                    section_render.brightness,
+                    section_render.roughness,
+                    section_render.sustain,
+                )
+            )
+        })
+        .collect()
+}
+
+fn render_override_summary(
+    mode: Option<RenderMode>,
+    stereo_width: Option<f32>,
+    drive: Option<f32>,
+    brightness: Option<f32>,
+    roughness: Option<f32>,
+    sustain: Option<f32>,
+) -> String {
+    let mut fields = Vec::new();
+    if let Some(mode) = mode {
+        fields.push(format!("mode={}", render_mode_name(mode)));
+    }
+    if let Some(stereo_width) = stereo_width {
+        fields.push(format!("stereo_width={stereo_width:.2}"));
+    }
+    if let Some(drive) = drive {
+        fields.push(format!("drive={drive:.2}"));
+    }
+    if let Some(brightness) = brightness {
+        fields.push(format!("brightness={brightness:.2}"));
+    }
+    if let Some(roughness) = roughness {
+        fields.push(format!("roughness={roughness:.2}"));
+    }
+    if let Some(sustain) = sustain {
+        fields.push(format!("sustain={sustain:.2}"));
+    }
+
+    if fields.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", fields.join(", "))
+    }
 }
 
 pub fn scan_metadata(
@@ -526,6 +845,10 @@ fn metadata_for_events(config: &GenerationConfig, events: &[Event]) -> Generatio
         events: events.len(),
         collisions,
         voice_density,
+        voice_render_count: config.voice_renders.len(),
+        section_render_count: config.section_renders.len(),
+        voice_renders: voice_render_summaries(config),
+        section_renders: section_render_summaries(config),
     }
 }
 
@@ -957,6 +1280,18 @@ fn json_usize(source: &str, key: &str) -> Result<usize, GenerateError> {
         .map_err(|_| GenerateError::Config(format!("metadata key '{key}' is not an integer")))
 }
 
+fn json_optional_usize(source: &str, key: &str) -> Result<Option<usize>, GenerateError> {
+    let Some(value) = json_value_optional(source, key)? else {
+        return Ok(None);
+    };
+    value
+        .trim_matches(',')
+        .trim()
+        .parse()
+        .map(Some)
+        .map_err(|_| GenerateError::Config(format!("metadata key '{key}' is not an integer")))
+}
+
 fn json_usize_array(source: &str, key: &str) -> Result<Vec<usize>, GenerateError> {
     let value = json_value(source, key)?;
     let start = value
@@ -980,18 +1315,79 @@ fn json_usize_array(source: &str, key: &str) -> Result<Vec<usize>, GenerateError
         .collect()
 }
 
+fn json_optional_string_array(
+    source: &str,
+    key: &str,
+) -> Result<Option<Vec<String>>, GenerateError> {
+    let Some(value) = json_value_optional(source, key)? else {
+        return Ok(None);
+    };
+    Ok(Some(parse_json_string_array_value(value, key)?))
+}
+
+fn parse_json_string_array_value(value: &str, key: &str) -> Result<Vec<String>, GenerateError> {
+    let start = value
+        .find('[')
+        .ok_or_else(|| GenerateError::Config(format!("metadata key '{key}' is not an array")))?;
+    let end = value
+        .rfind(']')
+        .ok_or_else(|| GenerateError::Config(format!("metadata key '{key}' is not an array")))?;
+    let inner = value[start + 1..end].trim();
+    if inner.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut values = Vec::new();
+    let mut current = String::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    for character in inner.chars() {
+        if !in_string {
+            if character == '"' {
+                in_string = true;
+            }
+            continue;
+        }
+
+        if escaped {
+            current.push(character);
+            escaped = false;
+        } else if character == '\\' {
+            escaped = true;
+        } else if character == '"' {
+            values.push(std::mem::take(&mut current));
+            in_string = false;
+        } else {
+            current.push(character);
+        }
+    }
+
+    if in_string {
+        return Err(GenerateError::Config(format!(
+            "metadata key '{key}' has unterminated string"
+        )));
+    }
+
+    Ok(values)
+}
+
 fn json_value<'a>(source: &'a str, key: &str) -> Result<&'a str, GenerateError> {
+    json_value_optional(source, key)?
+        .ok_or_else(|| GenerateError::Config(format!("metadata missing key '{key}'")))
+}
+
+fn json_value_optional<'a>(source: &'a str, key: &str) -> Result<Option<&'a str>, GenerateError> {
     let needle = format!("\"{key}\"");
-    let key_start = source
-        .find(&needle)
-        .ok_or_else(|| GenerateError::Config(format!("metadata missing key '{key}'")))?;
+    let Some(key_start) = source.find(&needle) else {
+        return Ok(None);
+    };
     let after_key = &source[key_start + needle.len()..];
     let colon = after_key
         .find(':')
         .ok_or_else(|| GenerateError::Config(format!("metadata key '{key}' has no value")))?;
     let after_colon = after_key[colon + 1..].trim_start();
     let line_end = after_colon.find('\n').unwrap_or(after_colon.len());
-    Ok(after_colon[..line_end].trim().trim_end_matches(','))
+    Ok(Some(after_colon[..line_end].trim().trim_end_matches(',')))
 }
 
 fn parse_u64(value: &str) -> Result<u64, GenerateError> {
@@ -1039,4 +1435,13 @@ fn ensure_parent_dir(path: &Path) -> Result<(), GenerateError> {
 
 fn escape_json(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn json_string_array(values: &[String]) -> String {
+    let values = values
+        .iter()
+        .map(|value| format!("\"{}\"", escape_json(value)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{values}]")
 }

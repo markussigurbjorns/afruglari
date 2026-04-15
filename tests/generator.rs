@@ -2,8 +2,8 @@ use afruglari::{
     AntiRepeatWindow, Constraint, DifferentAdjacent, Domain, Event, ExactCount, Implication,
     Literal, MaxCount, MaxRun, MinCount, MinDensityWindow, Param, PhaseResponse, PieceConfig,
     PiecePreset, RenderConfig, RenderMode, SlowChange, Value, VarId, events_from_grid,
-    example_piece, generate_one, piece_from_preset, render_events_to_wav, scan_metadata, solve,
-    solve_with_seed,
+    example_piece, generate_batch_from_config, generate_one, piece_from_preset,
+    render_events_to_wav, scan_metadata, solve, solve_with_seed,
 };
 
 #[test]
@@ -271,6 +271,32 @@ fn config_parser_accepts_piece_and_render_sections() {
         delay_feedback = 0.4
         delay_seconds = 0.5
         drive = 1.3
+        brightness = 1.4
+        roughness = 0.7
+        sustain = 1.8
+
+        [[section]]
+        name = "rupture"
+        start = 8
+        end = 16
+
+        [[section_render]]
+        section = "rupture"
+        mode = "broken-radio"
+        stereo_width = 0.9
+        drive = 1.7
+        brightness = 1.8
+        roughness = 2.2
+        sustain = 0.6
+
+        [[voice_render]]
+        voice = 1
+        mode = "metallic"
+        stereo_width = 0.3
+        drive = 1.1
+        brightness = 0.9
+        roughness = 1.5
+        sustain = 2.1
         "#,
     )
     .unwrap();
@@ -287,6 +313,28 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.render.delay_feedback, 0.4);
     assert_eq!(config.render.delay_seconds, 0.5);
     assert_eq!(config.render.drive, 1.3);
+    assert_eq!(config.render.brightness, 1.4);
+    assert_eq!(config.render.roughness, 0.7);
+    assert_eq!(config.render.sustain, 1.8);
+    assert_eq!(config.section_renders.len(), 1);
+    assert_eq!(config.section_renders[0].section, "rupture");
+    assert_eq!(
+        config.section_renders[0].mode,
+        Some(RenderMode::BrokenRadio)
+    );
+    assert_eq!(config.section_renders[0].stereo_width, Some(0.9));
+    assert_eq!(config.section_renders[0].drive, Some(1.7));
+    assert_eq!(config.section_renders[0].brightness, Some(1.8));
+    assert_eq!(config.section_renders[0].roughness, Some(2.2));
+    assert_eq!(config.section_renders[0].sustain, Some(0.6));
+    assert_eq!(config.voice_renders.len(), 1);
+    assert_eq!(config.voice_renders[0].voice, 1);
+    assert_eq!(config.voice_renders[0].mode, Some(RenderMode::Metallic));
+    assert_eq!(config.voice_renders[0].stereo_width, Some(0.3));
+    assert_eq!(config.voice_renders[0].drive, Some(1.1));
+    assert_eq!(config.voice_renders[0].brightness, Some(0.9));
+    assert_eq!(config.voice_renders[0].roughness, Some(1.5));
+    assert_eq!(config.voice_renders[0].sustain, Some(2.1));
 }
 
 #[test]
@@ -298,6 +346,8 @@ fn generate_one_writes_wav_and_metadata() {
         preset: PiecePreset::Example,
         piece: None,
         sections: Vec::new(),
+        section_renders: Vec::new(),
+        voice_renders: Vec::new(),
         constraints: Vec::new(),
         seed: 3,
         output: wav.clone(),
@@ -410,6 +460,113 @@ fn custom_config_constraints_generate_a_piece() {
 
     let _ = std::fs::remove_file(wav);
     let _ = std::fs::remove_file(json);
+}
+
+#[test]
+fn metadata_records_render_automation() {
+    let base = std::env::temp_dir().join("afruglari-render-metadata-test");
+    let wav = base.with_extension("wav");
+    let json = base.with_extension("json");
+    let source = format!(
+        r#"
+        [piece]
+        voices = 2
+        steps = 10
+        seed = 5
+        output = "{}"
+        render_mode = "drone"
+
+        [render]
+        sample_rate = 8000
+        step_seconds = 0.02
+        tail_seconds = 0.02
+
+        [[section]]
+        name = "break"
+        start = 5
+        end = 10
+
+        [[voice_render]]
+        voice = 0
+        mode = "noise-organ"
+        brightness = 0.7
+
+        [[section_render]]
+        section = "break"
+        mode = "broken-radio"
+        roughness = 2.2
+
+        [[constraint]]
+        type = "exact-count"
+        param = "active"
+        value = true
+        count = 6
+        "#,
+        wav.display()
+    );
+    let config = afruglari::GenerationConfig::parse(&source).unwrap();
+    let result = generate_one(&config).unwrap();
+
+    assert_eq!(result.metadata.voice_render_count, 1);
+    assert_eq!(result.metadata.section_render_count, 1);
+    assert!(result.metadata.voice_renders[0].contains("voice 0"));
+    assert!(result.metadata.section_renders[0].contains("section break"));
+
+    let metadata = std::fs::read_to_string(&json).unwrap();
+    assert!(metadata.contains(r#""voice_render_count": 1"#));
+    assert!(metadata.contains(r#""section_render_count": 1"#));
+    assert!(metadata.contains("noise-organ"));
+    assert!(metadata.contains("broken-radio"));
+
+    let parsed = afruglari::GenerationMetadata::parse_json(&metadata).unwrap();
+    assert_eq!(parsed.voice_render_count, 1);
+    assert_eq!(parsed.section_render_count, 1);
+
+    let _ = std::fs::remove_file(wav);
+    let _ = std::fs::remove_file(json);
+}
+
+#[test]
+fn batch_from_config_renders_multiple_seeded_versions() {
+    let base = std::env::temp_dir().join("afruglari-batch-config-test");
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).unwrap();
+    let config_path = base.join("tiny-piece.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+        [piece]
+        voices = 2
+        steps = 8
+        seed = 20
+        render_mode = "metallic"
+
+        [render]
+        sample_rate = 8000
+        step_seconds = 0.02
+        tail_seconds = 0.02
+
+        [[constraint]]
+        type = "exact-count"
+        param = "active"
+        value = true
+        count = 5
+        "#,
+    )
+    .unwrap();
+    let output_dir = base.join("renders");
+
+    let results = generate_batch_from_config(&config_path, 2, &output_dir).unwrap();
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].metadata.seed, 20);
+    assert_eq!(results[1].metadata.seed, 21);
+    assert!(output_dir.join("tiny-piece-seed-020.wav").exists());
+    assert!(output_dir.join("tiny-piece-seed-021.wav").exists());
+    assert!(output_dir.join("tiny-piece-seed-020.json").exists());
+    assert!(output_dir.join("tiny-piece-seed-021.json").exists());
+
+    let _ = std::fs::remove_dir_all(base);
 }
 
 #[test]
@@ -539,6 +696,83 @@ fn section_constraints_scope_counts_to_named_ranges() {
     let result = generate_one(&config).unwrap();
 
     assert_eq!(result.metadata.events, 10);
+    assert!(wav.exists());
+    assert!(json.exists());
+
+    let _ = std::fs::remove_file(wav);
+    let _ = std::fs::remove_file(json);
+}
+
+#[test]
+fn section_render_settings_generate_with_section_automation() {
+    let base = std::env::temp_dir().join("afruglari-section-render-test");
+    let wav = base.with_extension("wav");
+    let json = base.with_extension("json");
+    let source = format!(
+        r#"
+        [piece]
+        voices = 2
+        steps = 12
+        seed = 11
+        output = "{}"
+        render_mode = "drone"
+
+        [render]
+        sample_rate = 8000
+        step_seconds = 0.03
+        tail_seconds = 0.04
+        brightness = 0.8
+        roughness = 0.6
+        sustain = 1.8
+
+        [[section]]
+        name = "opening"
+        start = 0
+        end = 6
+
+        [[section]]
+        name = "rupture"
+        start = 6
+        end = 12
+
+        [[section_render]]
+        section = "rupture"
+        mode = "broken-radio"
+        stereo_width = 0.9
+        drive = 1.8
+        brightness = 1.7
+        roughness = 2.4
+        sustain = 0.5
+
+        [[voice_render]]
+        voice = 0
+        mode = "noise-organ"
+        brightness = 0.7
+        roughness = 1.1
+        sustain = 2.0
+
+        [[voice_render]]
+        voice = 1
+        mode = "metallic"
+        brightness = 1.4
+        roughness = 1.8
+        sustain = 0.8
+
+        [[constraint]]
+        type = "exact-count"
+        param = "active"
+        value = true
+        count = 8
+        "#,
+        wav.display()
+    );
+    let config = afruglari::GenerationConfig::parse(&source).unwrap();
+
+    assert_eq!(config.section_renders.len(), 1);
+    assert_eq!(config.voice_renders.len(), 2);
+    let result = generate_one(&config).unwrap();
+
+    assert_eq!(result.metadata.events, 8);
     assert!(wav.exists());
     assert!(json.exists());
 

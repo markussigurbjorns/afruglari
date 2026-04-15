@@ -1,6 +1,6 @@
 use afruglari::{
     GenerateError, GenerationConfig, PiecePreset, RenderConfig, RenderMode, generate_batch,
-    generate_from_config, generate_one, preset_names, scan_metadata,
+    generate_batch_from_config, generate_from_config, generate_one, preset_names, scan_metadata,
 };
 
 fn main() {
@@ -13,6 +13,8 @@ fn main() {
 
     let result = if args.first().is_some_and(|arg| arg == "--config") {
         run_config(&args)
+    } else if args.first().is_some_and(|arg| arg == "--batch-config") {
+        run_batch_config(&args)
     } else if args.first().is_some_and(|arg| arg == "--batch") {
         run_batch(&args)
     } else if args.first().is_some_and(|arg| arg == "--scan") {
@@ -33,6 +35,30 @@ fn run_config(args: &[String]) -> Result<(), GenerateError> {
     })?;
     let result = generate_from_config(path)?;
     print_result(&result);
+    Ok(())
+}
+
+fn run_batch_config(args: &[String]) -> Result<(), GenerateError> {
+    let path = args.get(1).ok_or_else(|| {
+        GenerateError::Config(
+            "missing config path; usage: --batch-config pieces/file.toml count output_dir"
+                .to_string(),
+        )
+    })?;
+    let count = args
+        .get(2)
+        .ok_or_else(|| GenerateError::Config("missing batch-config count".to_string()))?
+        .parse::<usize>()
+        .map_err(|_| GenerateError::Config("invalid batch-config count".to_string()))?;
+    let output_dir = args.get(3).ok_or_else(|| {
+        GenerateError::Config("missing batch-config output directory".to_string())
+    })?;
+
+    let results = generate_batch_from_config(path, count, output_dir)?;
+    for result in &results {
+        print_result(result);
+    }
+    println!("batch renders={}", results.len());
     Ok(())
 }
 
@@ -74,15 +100,17 @@ fn run_scan(args: &[String]) -> Result<(), GenerateError> {
     let entries = scan_metadata(dir, &filter)?;
 
     println!(
-        "{:<44} {:>6} {:>10} {:<16} output",
-        "metadata", "events", "collisions", "voice_density"
+        "{:<44} {:>6} {:>10} {:>7} {:>7} {:<16} output",
+        "metadata", "events", "collisions", "voices", "sections", "voice_density"
     );
     for entry in &entries {
         println!(
-            "{:<44} {:>6} {:>10} {:<16} {}",
+            "{:<44} {:>6} {:>10} {:>7} {:>7} {:<16} {}",
             entry.metadata_path.display(),
             entry.metadata.events,
             entry.metadata.collisions,
+            entry.metadata.voice_render_count,
+            entry.metadata.section_render_count,
             format!("{:?}", entry.metadata.voice_density),
             entry.metadata.output.display()
         );
@@ -124,6 +152,8 @@ fn run_single(args: &[String]) -> Result<(), GenerateError> {
         preset,
         piece: None,
         sections: Vec::new(),
+        section_renders: Vec::new(),
+        voice_renders: Vec::new(),
         constraints: Vec::new(),
         seed,
         output: output.into(),
@@ -161,6 +191,7 @@ fn print_result(result: &afruglari::GenerateResult) {
 fn print_usage() {
     println!("usage: cargo run -- [preset] [seed] [output.wav] [render-mode]");
     println!("       cargo run -- --config pieces/file.toml");
+    println!("       cargo run -- --batch-config pieces/file.toml count output_dir");
     println!("       cargo run -- --batch preset count output_dir [render-mode]");
     println!("       cargo run -- --scan dir [filters]");
     println!();
@@ -172,6 +203,9 @@ fn print_usage() {
     println!("  cargo run -- slow-noise-blocks 7 target/slow.wav drone");
     println!("  cargo run -- dense-collision-field 99 target/dense.wav noise-organ");
     println!("  cargo run -- --config pieces/sparse.toml");
+    println!(
+        "  cargo run -- --batch-config pieces/sectioned-form.toml 8 target/renders/sectioned-form"
+    );
     println!("  cargo run -- --batch sparse-cracks 8 target/renders/sparse broken-radio");
     println!("  cargo run -- --scan target/renders/sparse --min-collisions 5");
 }

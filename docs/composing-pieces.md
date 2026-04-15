@@ -72,6 +72,9 @@ delay_mix = 0.15
 delay_feedback = 0.30
 delay_seconds = 0.37
 drive = 1.2
+brightness = 1.0
+roughness = 1.2
+sustain = 1.4
 
 [[constraint]]
 type = "exact-count"
@@ -194,6 +197,9 @@ delay_mix = 0.15
 delay_feedback = 0.30
 delay_seconds = 0.37
 drive = 1.2
+brightness = 1.0
+roughness = 1.2
+sustain = 1.4
 ```
 
 Field meanings:
@@ -204,7 +210,86 @@ delay_mix        how much cross-channel delay is added
 delay_feedback   how strongly delayed material feeds forward
 delay_seconds    delay time
 drive            tanh saturation amount before writing the WAV
+brightness       shifts resonators and carriers upward or downward
+roughness        increases noise, modulation, folding, and gating
+sustain          stretches event tails and envelope decay
 ```
+
+You can override the event-level render settings inside named sections:
+
+```toml
+[[section]]
+name = "opening"
+start = 0
+end = 48
+
+[[section]]
+name = "rupture"
+start = 48
+end = 96
+
+[[section_render]]
+section = "opening"
+brightness = 0.65
+roughness = 0.75
+sustain = 2.40
+stereo_width = 0.60
+
+[[section_render]]
+section = "rupture"
+mode = "broken-radio"
+brightness = 1.75
+roughness = 2.45
+sustain = 0.55
+stereo_width = 1.00
+drive = 1.70
+```
+
+`[[section_render]]` changes how events in that step range are synthesized. It currently affects `mode`, `stereo_width`, `drive`, `brightness`, `roughness`, and `sustain`; timing and delay remain global in `[render]`.
+
+You can also give each voice its own sound role:
+
+```toml
+[[voice_render]]
+voice = 0
+mode = "noise-organ"
+brightness = 0.78
+roughness = 1.10
+sustain = 2.10
+stereo_width = 0.35
+
+[[voice_render]]
+voice = 1
+mode = "metallic"
+brightness = 1.20
+roughness = 1.55
+sustain = 0.85
+stereo_width = 0.95
+
+[[voice_render]]
+voice = 2
+mode = "drone"
+brightness = 0.90
+roughness = 0.90
+sustain = 2.60
+stereo_width = 0.70
+```
+
+Render settings are layered in this order:
+
+```text
+[render] -> [[voice_render]] -> [[section_render]]
+```
+
+That means voice mappings define the normal sound identity of each layer, and section automation can still force a change of state across the whole form.
+
+Batch a composed config across several seeds with:
+
+```bash
+cargo run -- --batch-config pieces/ritual-machines.toml 8 target/renders/ritual-machines
+```
+
+Each render writes a WAV and matching JSON metadata. The metadata includes event counts, collisions, voice density, and summaries of `[[voice_render]]` and `[[section_render]]` mappings so scan output can distinguish structural results from sound-design choices.
 
 ## Parameters
 
@@ -353,6 +438,9 @@ delay_mix = 0.16
 delay_feedback = 0.30
 delay_seconds = 0.41
 drive = 1.15
+brightness = 0.75
+roughness = 1.60
+sustain = 2.20
 
 [[constraint]]
 type = "max-run"

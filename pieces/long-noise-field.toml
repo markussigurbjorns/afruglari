@@ -17,6 +17,9 @@ delay_mix = 0.16
 delay_feedback = 0.30
 delay_seconds = 0.41
 drive = 1.15
+brightness = 0.75
+roughness = 1.60
+sustain = 2.20
 
 [[constraint]]
 type = "max-run"

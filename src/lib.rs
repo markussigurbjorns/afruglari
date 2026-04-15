@@ -12,9 +12,12 @@ pub use constraints::{
 pub use csp::{Conflict, Constraint, Domain, Engine, Value, VarId, solve, solve_with_seed};
 pub use grid::{Event, Grid, Param, events_from_grid};
 pub use presets::{PiecePreset, example_piece, piece_from_preset, preset_names};
-pub use render::{RenderConfig, RenderMode, render_events_to_wav};
+pub use render::{
+    RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, render_events_to_wav,
+    render_events_to_wav_with_automation, render_events_to_wav_with_sections,
+};
 pub use workflow::{
     ConstraintConfig, GenerateError, GenerateResult, GenerationConfig, GenerationMetadata,
-    MetadataFilter, PieceConfig, ScanEntry, SectionConfig, generate_batch, generate_from_config,
-    generate_one, scan_metadata,
+    MetadataFilter, PieceConfig, ScanEntry, SectionConfig, SectionRenderConfig, VoiceRenderConfig,
+    generate_batch, generate_batch_from_config, generate_from_config, generate_one, scan_metadata,
 };
