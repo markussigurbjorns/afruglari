@@ -170,6 +170,9 @@ drone
 broken-radio
 metallic
 noise-organ
+granular-dust
+sub-machine
+glass-harmonics
 ```
 
 General character:
@@ -180,6 +183,9 @@ drone          longer overlapping tones and unstable resonance
 broken-radio   gated noise, crushed signal, unstable synthetic radio
 metallic       inharmonic struck partials
 noise-organ    banded noisy tones with organ-like overlap
+granular-dust  tiny noisy grains and unstable spark bursts
+sub-machine    low pulse trains, thumps, and mechanical wobble
+glass-harmonics brittle ringing partials with sharp glassy decay
 ```
 
 Set the mode in `[piece]`:

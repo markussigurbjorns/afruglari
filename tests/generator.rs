@@ -260,7 +260,7 @@ fn config_parser_accepts_piece_and_render_sections() {
         preset = "slow-noise-blocks"
         seed = 7
         output = "target/custom.wav"
-        render_mode = "drone"
+        render_mode = "sub-machine"
 
         [render]
         sample_rate = 22050
@@ -282,7 +282,7 @@ fn config_parser_accepts_piece_and_render_sections() {
 
         [[section_render]]
         section = "rupture"
-        mode = "broken-radio"
+        mode = "granular-dust"
         stereo_width = 0.9
         drive = 1.7
         brightness = 1.8
@@ -291,7 +291,7 @@ fn config_parser_accepts_piece_and_render_sections() {
 
         [[voice_render]]
         voice = 1
-        mode = "metallic"
+        mode = "glass-harmonics"
         stereo_width = 0.3
         drive = 1.1
         brightness = 0.9
@@ -304,7 +304,7 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.preset, PiecePreset::SlowNoiseBlocks);
     assert_eq!(config.seed, 7);
     assert_eq!(config.output, std::path::PathBuf::from("target/custom.wav"));
-    assert_eq!(config.render.mode, RenderMode::Drone);
+    assert_eq!(config.render.mode, RenderMode::SubMachine);
     assert_eq!(config.render.sample_rate, 22_050);
     assert_eq!(config.render.step_seconds, 0.2);
     assert_eq!(config.render.tail_seconds, 2.0);
@@ -320,7 +320,7 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.section_renders[0].section, "rupture");
     assert_eq!(
         config.section_renders[0].mode,
-        Some(RenderMode::BrokenRadio)
+        Some(RenderMode::GranularDust)
     );
     assert_eq!(config.section_renders[0].stereo_width, Some(0.9));
     assert_eq!(config.section_renders[0].drive, Some(1.7));
@@ -329,7 +329,10 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.section_renders[0].sustain, Some(0.6));
     assert_eq!(config.voice_renders.len(), 1);
     assert_eq!(config.voice_renders[0].voice, 1);
-    assert_eq!(config.voice_renders[0].mode, Some(RenderMode::Metallic));
+    assert_eq!(
+        config.voice_renders[0].mode,
+        Some(RenderMode::GlassHarmonics)
+    );
     assert_eq!(config.voice_renders[0].stereo_width, Some(0.3));
     assert_eq!(config.voice_renders[0].drive, Some(1.1));
     assert_eq!(config.voice_renders[0].brightness, Some(0.9));
@@ -474,7 +477,7 @@ fn metadata_records_render_automation() {
         steps = 10
         seed = 5
         output = "{}"
-        render_mode = "drone"
+        render_mode = "sub-machine"
 
         [render]
         sample_rate = 8000
@@ -493,7 +496,7 @@ fn metadata_records_render_automation() {
 
         [[section_render]]
         section = "break"
-        mode = "broken-radio"
+        mode = "granular-dust"
         roughness = 2.2
 
         [[constraint]]
@@ -516,7 +519,7 @@ fn metadata_records_render_automation() {
     assert!(metadata.contains(r#""voice_render_count": 1"#));
     assert!(metadata.contains(r#""section_render_count": 1"#));
     assert!(metadata.contains("noise-organ"));
-    assert!(metadata.contains("broken-radio"));
+    assert!(metadata.contains("granular-dust"));
 
     let parsed = afruglari::GenerationMetadata::parse_json(&metadata).unwrap();
     assert_eq!(parsed.voice_render_count, 1);
@@ -746,7 +749,7 @@ fn section_render_settings_generate_with_section_automation() {
 
         [[voice_render]]
         voice = 0
-        mode = "noise-organ"
+        mode = "glass-harmonics"
         brightness = 0.7
         roughness = 1.1
         sustain = 2.0

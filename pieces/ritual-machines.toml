@@ -4,7 +4,7 @@ steps = 24
 registers = 4
 timbres = 5
 intensities = 5
-seed = 73
+seed = 7234
 output = "target/pieces/ritual-machines-73.wav"
 render_mode = "noise-organ"
 
@@ -43,7 +43,7 @@ end = 24
 
 [[voice_render]]
 voice = 0
-mode = "drone"
+mode = "sub-machine"
 brightness = 0.62
 roughness = 0.80
 sustain = 3.20
@@ -51,7 +51,7 @@ stereo_width = 0.45
 
 [[voice_render]]
 voice = 1
-mode = "metallic"
+mode = "glass-harmonics"
 brightness = 1.30
 roughness = 1.65
 sustain = 0.75
@@ -59,7 +59,7 @@ stereo_width = 0.95
 
 [[voice_render]]
 voice = 2
-mode = "broken-radio"
+mode = "granular-dust"
 brightness = 1.55
 roughness = 2.10
 sustain = 0.65
@@ -81,7 +81,7 @@ sustain = 1.70
 
 [[section_render]]
 section = "fault"
-mode = "broken-radio"
+mode = "granular-dust"
 brightness = 1.90
 roughness = 2.70
 sustain = 0.45

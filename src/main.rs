@@ -165,7 +165,7 @@ fn run_single(args: &[String]) -> Result<(), GenerateError> {
 }
 
 fn parse_render_mode(name: &str) -> Option<RenderMode> {
-    afruglari::workflow::parse_render_mode(name)
+    afruglari::parse_render_mode(name)
 }
 
 fn default_mode_for_preset(preset: PiecePreset) -> RenderMode {
@@ -178,7 +178,7 @@ fn print_result(result: &afruglari::GenerateResult) {
         "piece={} seed={} mode={}",
         metadata.piece,
         metadata.seed,
-        afruglari::workflow::render_mode_name(metadata.render_mode)
+        afruglari::render_mode_name(metadata.render_mode)
     );
     println!("wrote {}", metadata.output.display());
     println!("metadata {}", metadata.json_path().display());
@@ -196,7 +196,9 @@ fn print_usage() {
     println!("       cargo run -- --scan dir [filters]");
     println!();
     println!("presets: {}", preset_names().join(", "));
-    println!("render modes: percussive, drone, broken-radio, metallic, noise-organ");
+    println!(
+        "render modes: percussive, drone, broken-radio, metallic, noise-organ, granular-dust, sub-machine, glass-harmonics"
+    );
     println!();
     println!("examples:");
     println!("  cargo run -- sparse-cracks 42 target/sparse-42.wav");
