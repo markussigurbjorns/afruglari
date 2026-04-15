@@ -1,0 +1,59 @@
+[piece]
+voices = 3
+steps = 48
+registers = 5
+timbres = 7
+intensities = 5
+seed = 31
+output = "target/pieces/phase-response-study-31.wav"
+render_mode = "metallic"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.18
+tail_seconds = 2.0
+
+[[constraint]]
+type = "min-count"
+voice = 2
+param = "active"
+value = true
+count = 10
+
+[[constraint]]
+type = "max-count"
+voice = 0
+param = "active"
+value = true
+count = 18
+
+[[constraint]]
+type = "exact-count"
+param = "active"
+value = true
+density = 0.32
+
+[[constraint]]
+type = "min-density-window"
+param = "active"
+window = 12
+min = 1
+
+[[constraint]]
+type = "different-adjacent"
+voice = 1
+param = "timbre"
+
+[[constraint]]
+type = "anti-repeat-window"
+voice = 1
+param = "timbre"
+window = 4
+max_repeats = 2
+
+[[constraint]]
+type = "phase-response"
+voice_a = 0
+voice_b = 2
+offset = 3
+min = 6

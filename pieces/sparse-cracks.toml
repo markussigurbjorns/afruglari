@@ -1,0 +1,10 @@
+[piece]
+preset = "sparse-cracks"
+seed = 42
+output = "target/pieces/sparse-cracks-42.wav"
+render_mode = "broken-radio"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.16
+tail_seconds = 1.5

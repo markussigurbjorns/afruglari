@@ -1,0 +1,61 @@
+[piece]
+voices = 3
+steps = 128
+registers = 5
+timbres = 8
+intensities = 6
+seed = 23
+output = "target/pieces/long-noise-field-23.wav"
+render_mode = "noise-organ"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.22
+tail_seconds = 2.5
+stereo_width = 0.8
+delay_mix = 0.16
+delay_feedback = 0.30
+delay_seconds = 0.41
+drive = 1.15
+
+[[constraint]]
+type = "max-run"
+voice = 0
+param = "active"
+len = 4
+
+[[constraint]]
+type = "max-run"
+voice = 1
+param = "active"
+len = 5
+
+[[constraint]]
+type = "exact-count"
+param = "active"
+value = true
+density = 0.24
+
+[[constraint]]
+type = "min-density-window"
+param = "active"
+window = 18
+min = 1
+
+[[constraint]]
+type = "at-least-collisions"
+voice_a = 1
+voice_b = 2
+count = 8
+
+[[constraint]]
+type = "slow-change"
+voice = 2
+param = "timbre"
+window = 8
+
+[[constraint]]
+type = "slow-change"
+voice = 0
+param = "intensity"
+window = 8

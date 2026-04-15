@@ -1,0 +1,50 @@
+[piece]
+voices = 3
+steps = 240
+registers = 5
+timbres = 8
+intensities = 6
+seed = 11
+output = "target/pieces/custom-collisions-11.wav"
+render_mode = "noise-organ"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.22
+tail_seconds = 3.0
+
+[[constraint]]
+type = "max-run"
+voice = 0
+param = "active"
+len = 2
+
+[[constraint]]
+type = "max-run"
+voice = 1
+param = "active"
+len = 3
+
+[[constraint]]
+type = "exact-count"
+param = "active"
+value = true
+count = 38
+
+[[constraint]]
+type = "min-density-window"
+param = "active"
+window = 9
+min = 1
+
+[[constraint]]
+type = "at-least-collisions"
+voice_a = 1
+voice_b = 2
+count = 5
+
+[[constraint]]
+type = "slow-change"
+voice = 2
+param = "timbre"
+window = 4
