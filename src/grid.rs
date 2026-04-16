@@ -8,6 +8,12 @@ pub enum Param {
     Intensity,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EventDurationMode {
+    SingleStep,
+    MergeAdjacent,
+}
+
 #[derive(Clone, Debug)]
 pub struct Grid {
     voices: usize,
@@ -77,31 +83,85 @@ pub struct Event {
 }
 
 pub fn events_from_grid(engine: &Engine, grid: &Grid) -> Vec<Event> {
+    events_from_grid_with_durations(engine, grid, EventDurationMode::SingleStep, 1)
+}
+
+pub fn events_from_grid_with_durations(
+    engine: &Engine,
+    grid: &Grid,
+    mode: EventDurationMode,
+    max_duration_steps: usize,
+) -> Vec<Event> {
     let mut events = Vec::new();
+    let max_duration_steps = max_duration_steps.max(1);
 
     for voice in 0..grid.voices {
-        for step in 0..grid.steps {
+        let mut step = 0;
+        while step < grid.steps {
             if engine.value(grid.var(voice, step, Param::Active)) != Some(Value::Bool(true)) {
+                step += 1;
                 continue;
+            }
+
+            let register = match engine.value(grid.var(voice, step, Param::Register)) {
+                Some(Value::Int(value)) => Some(value),
+                _ => None,
+            };
+            let timbre = match engine.value(grid.var(voice, step, Param::Timbre)) {
+                Some(Value::Int(value)) => value,
+                _ => 0,
+            };
+            let intensity = match engine.value(grid.var(voice, step, Param::Intensity)) {
+                Some(Value::Int(value)) => value,
+                _ => 0,
+            };
+
+            let mut duration_steps = 1;
+            if mode == EventDurationMode::MergeAdjacent {
+                while step + duration_steps < grid.steps && duration_steps < max_duration_steps {
+                    let next_step = step + duration_steps;
+                    if engine.value(grid.var(voice, next_step, Param::Active))
+                        != Some(Value::Bool(true))
+                    {
+                        break;
+                    }
+
+                    let next_register =
+                        match engine.value(grid.var(voice, next_step, Param::Register)) {
+                            Some(Value::Int(value)) => Some(value),
+                            _ => None,
+                        };
+                    let next_timbre = match engine.value(grid.var(voice, next_step, Param::Timbre))
+                    {
+                        Some(Value::Int(value)) => value,
+                        _ => 0,
+                    };
+                    let next_intensity =
+                        match engine.value(grid.var(voice, next_step, Param::Intensity)) {
+                            Some(Value::Int(value)) => value,
+                            _ => 0,
+                        };
+
+                    if next_register != register
+                        || next_timbre != timbre
+                        || next_intensity != intensity
+                    {
+                        break;
+                    }
+
+                    duration_steps += 1;
+                }
             }
 
             events.push(Event {
                 voice,
                 step,
-                duration_steps: 1,
-                register: match engine.value(grid.var(voice, step, Param::Register)) {
-                    Some(Value::Int(value)) => Some(value),
-                    _ => None,
-                },
-                timbre: match engine.value(grid.var(voice, step, Param::Timbre)) {
-                    Some(Value::Int(value)) => value,
-                    _ => 0,
-                },
-                intensity: match engine.value(grid.var(voice, step, Param::Intensity)) {
-                    Some(Value::Int(value)) => value,
-                    _ => 0,
-                },
+                duration_steps,
+                register,
+                timbre,
+                intensity,
             });
+            step += duration_steps;
         }
     }
 

@@ -1,4 +1,8 @@
 use super::RenderConfig;
+use super::dsp::{
+    OnePoleHighpass, OnePoleLowpass, attack_decay_env, decay_env, noise_step, pitch_drop, sine_hz,
+    transient_env,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ToneControls {
@@ -30,6 +34,14 @@ pub(crate) fn render_fm_pulse(
     let len = ((duration + 0.35 * tone.sustain) * sample_rate as f32) as usize;
     let carrier = 45.0 * tone.brightness * 2.0_f32.powf(register as f32 * 0.22);
     let modulator = carrier * (1.5 + timbre * 0.17 + tone.roughness * 0.15);
+    let mut body_low = OnePoleLowpass::new(
+        sample_rate,
+        (220.0 + register as f32 * 34.0 + tone.brightness * 70.0).clamp(90.0, 3_000.0),
+    );
+    let mut click_high = OnePoleHighpass::new(
+        sample_rate,
+        (1_800.0 + timbre * 150.0 + tone.brightness * 420.0).clamp(500.0, 10_000.0),
+    );
 
     for i in 0..len {
         let out = start + i;
@@ -37,12 +49,13 @@ pub(crate) fn render_fm_pulse(
             break;
         }
         let t = i as f32 / sample_rate as f32;
-        let env = (-t * (9.0 / tone.sustain)).exp();
-        let click =
-            (-t * 80.0).exp() * (t * 12_000.0 * tone.brightness).sin() * 0.08 * tone.roughness;
-        let fm = (t * modulator * std::f32::consts::TAU).sin() * (6.0 + timbre) * tone.roughness;
-        let body = ((t * carrier * std::f32::consts::TAU) + fm).sin();
-        samples[out] += (body * env + click) * amp;
+        let env = decay_env(t, 9.0, tone.sustain);
+        let fm = sine_hz(t, modulator) * (6.0 + timbre) * tone.roughness;
+        let body = (sine_hz(t, carrier) + fm).sin();
+        let shaped_body = body_low.process(body.tanh()) * env;
+        let click_src = sine_hz(t, 12_000.0 * tone.brightness) * 0.08 * tone.roughness;
+        let click = click_high.process(click_src) * transient_env(t, 80.0);
+        samples[out] += (shaped_body + click) * amp;
     }
 }
 
@@ -65,6 +78,15 @@ pub(crate) fn render_metallic_hit(
         2.92,
         4.63 + tone.brightness * 0.07,
     ];
+    let mut tone_low = OnePoleLowpass::new(
+        sample_rate,
+        (3_200.0 + register as f32 * 280.0 + timbre * 90.0).clamp(900.0, 10_500.0),
+    );
+    let mut strike_high = OnePoleHighpass::new(
+        sample_rate,
+        (1_400.0 + timbre * 110.0 + tone.brightness * 300.0).clamp(400.0, 8_000.0),
+    );
+    let mut state = 0x7f4a_7c15_u32 ^ start as u32 ^ ((register as u32) << 10) ^ timbre as u32;
 
     for i in 0..len {
         let out = start + i;
@@ -72,14 +94,14 @@ pub(crate) fn render_metallic_hit(
             break;
         }
         let t = i as f32 / sample_rate as f32;
-        let env = (-t * ((4.0 + timbre * 0.4) / tone.sustain)).exp();
+        let env = decay_env(t, 4.0 + timbre * 0.4, tone.sustain);
         let mut value = 0.0;
         for (partial, ratio) in ratios.iter().enumerate() {
-            let phase = t * base * ratio * std::f32::consts::TAU;
-            value += phase.sin() * (1.0 / (partial as f32 + 1.0));
+            value += sine_hz(t, base * ratio) * (1.0 / (partial as f32 + 1.0));
         }
-        let folded = (value * (1.0 + timbre * 0.14 + tone.roughness * 0.2)).sin();
-        samples[out] += folded * env * amp * 0.8;
+        let folded = tone_low.process((value * (1.0 + timbre * 0.14 + tone.roughness * 0.2)).sin());
+        let strike = strike_high.process(noise_step(&mut state)) * transient_env(t, 42.0);
+        samples[out] += (folded * env + strike * (0.12 + tone.roughness * 0.05)) * amp * 0.8;
     }
 }
 
@@ -99,7 +121,14 @@ pub(crate) fn render_noise_cloud(
         ^ ((register as u32) << 8)
         ^ timbre as u32;
     let resonator = (240.0 + register as f32 * 110.0 + timbre * 29.0) * tone.brightness;
-    let mut last = 0.0_f32;
+    let mut band_low = OnePoleLowpass::new(
+        sample_rate,
+        (1_200.0 + register as f32 * 180.0 + tone.brightness * 360.0).clamp(300.0, 7_000.0),
+    );
+    let mut air_high = OnePoleHighpass::new(
+        sample_rate,
+        (2_200.0 + timbre * 120.0 + tone.roughness * 300.0).clamp(700.0, 11_000.0),
+    );
 
     for i in 0..len {
         let out = start + i;
@@ -107,23 +136,19 @@ pub(crate) fn render_noise_cloud(
             break;
         }
         let t = i as f32 / sample_rate as f32;
-        let env = if t < 0.025 {
-            t / 0.025
-        } else {
-            (-t * (1.8 / tone.sustain)).exp()
-        };
+        let env = attack_decay_env(t, 0.025, 1.8, tone.sustain);
 
         state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
         let noise = ((state >> 8) as f32 / 16_777_216.0) * 2.0 - 1.0;
-        let resonant_tone = (t * resonator * std::f32::consts::TAU).sin();
-        last = last * (0.94 - tone.roughness * 0.04).clamp(0.5, 0.98)
-            + noise * (0.06 + tone.roughness * 0.08).clamp(0.02, 0.5);
+        let resonant_tone = sine_hz(t, resonator);
+        let dust = band_low.process(noise) * 0.82;
+        let air = air_high.process(noise) * (0.12 + tone.roughness * 0.08);
         let gate = if ((t * (18.0 + timbre * 3.0 + tone.roughness * 6.0)) as u32) % 3 == 0 {
             1.0
         } else {
             0.35
         };
-        samples[out] += (last * 0.75 + resonant_tone * 0.25) * env * gate * amp;
+        samples[out] += (dust + resonant_tone * 0.22 + air) * env * gate * amp;
     }
 }
 
@@ -177,6 +202,18 @@ pub(crate) fn render_impact_kit(
         ^ ((voice as u32) << 9)
         ^ ((register as u32) << 4)
         ^ timbre as u32;
+    let mut body_low = OnePoleLowpass::new(
+        sample_rate,
+        (140.0 + register as f32 * 22.0 + tone.brightness * 40.0).clamp(60.0, 2_200.0),
+    );
+    let mut snap_high = OnePoleHighpass::new(
+        sample_rate,
+        (900.0 + timbre * 80.0 + tone.brightness * 280.0).clamp(300.0, 8_000.0),
+    );
+    let mut metal_tone = OnePoleLowpass::new(
+        sample_rate,
+        (2_800.0 + register as f32 * 240.0 + timbre * 110.0).clamp(800.0, 9_500.0),
+    );
 
     for i in 0..len {
         let out = start + i;
@@ -185,33 +222,31 @@ pub(crate) fn render_impact_kit(
         }
 
         let t = i as f32 / sample_rate as f32;
-        state ^= state << 13;
-        state ^= state >> 17;
-        state ^= state << 5;
-        let noise = ((state & 0xffff) as f32 / 32_768.0) - 1.0;
+        let noise = noise_step(&mut state);
 
         let value = match voice % 3 {
             0 => {
                 let base = (38.0 + register as f32 * 6.0) * tone.brightness.max(0.4);
-                let drop = 1.0 + (-t * 28.0).exp() * (1.8 + timbre * 0.08);
-                let phase = t * base * drop * std::f32::consts::TAU;
-                let body = phase.sin();
-                let sub = (phase * 0.5).sin() * 0.45;
-                let click = (-t * 85.0).exp() * noise * (0.18 + tone.roughness * 0.04);
-                let env = (-t * (11.0 / tone.sustain)).exp();
-                (body + sub) * env * 1.2 + click
+                let freq = base * pitch_drop(t, 1.8 + timbre * 0.08, 28.0);
+                let body = sine_hz(t, freq);
+                let sub = sine_hz(t, freq * 0.5) * 0.45;
+                let thump = body_low.process((body + sub).tanh());
+                let click = snap_high.process(noise) * transient_env(t, 95.0);
+                let env = decay_env(t, 11.0, tone.sustain);
+                thump * env * 1.24 + click * (0.14 + tone.roughness * 0.05)
             }
             1 => {
                 let ring = (220.0 + register as f32 * 55.0 + timbre * 12.0) * tone.brightness;
-                let wire = (t * ring * std::f32::consts::TAU).sin() * 0.28;
-                let grain = noise * (0.78 + tone.roughness * 0.18);
-                let gate = if ((t * (52.0 + timbre * 3.5)) as usize) % 2 == 0 {
+                let wire = sine_hz(t, ring) * 0.24;
+                let grain = snap_high.process(noise) * (0.74 + tone.roughness * 0.16);
+                let gate = if ((t * (48.0 + timbre * 3.5)) as usize) % 2 == 0 {
                     1.0
                 } else {
-                    0.55
+                    0.48
                 };
-                let env = (-t * ((20.0 + timbre * 0.9) / tone.sustain)).exp();
-                (grain + wire) * env * gate
+                let noise_env = decay_env(t, 24.0 + timbre * 0.9, tone.sustain);
+                let ring_env = decay_env(t, 14.0, tone.sustain);
+                (grain * noise_env + wire * ring_env) * gate
             }
             _ => {
                 let base = (170.0 + register as f32 * 68.0 + timbre * 18.0) * tone.brightness;
@@ -223,12 +258,12 @@ pub(crate) fn render_impact_kit(
                 ];
                 let mut metal = 0.0_f32;
                 for (index, ratio) in partials.iter().enumerate() {
-                    metal += (t * base * ratio * std::f32::consts::TAU).sin()
-                        / (index as f32 + 1.0);
+                    metal += sine_hz(t, base * ratio) / (index as f32 + 1.0);
                 }
-                let scrape = noise * (-t * 34.0).exp() * (0.20 + tone.roughness * 0.06);
-                let env = (-t * ((9.0 + timbre * 0.5) / tone.sustain)).exp();
-                (metal * (1.0 + tone.roughness * 0.16)).sin() * env * 0.95 + scrape
+                let strike = metal_tone.process((metal * (1.0 + tone.roughness * 0.16)).sin());
+                let scrape = snap_high.process(noise) * transient_env(t, 36.0);
+                let env = decay_env(t, 9.0 + timbre * 0.5, tone.sustain);
+                strike * env * 0.95 + scrape * (0.16 + tone.roughness * 0.08)
             }
         };
 
@@ -253,6 +288,22 @@ pub(crate) fn render_techno_pulse(
         ^ ((voice as u32) << 11)
         ^ ((register as u32) << 5)
         ^ timbre as u32;
+    let mut kick_low = OnePoleLowpass::new(
+        sample_rate,
+        (165.0 + register as f32 * 24.0 + tone.brightness * 55.0).clamp(70.0, 1_800.0),
+    );
+    let mut hat_high = OnePoleHighpass::new(
+        sample_rate,
+        (3_800.0 + timbre * 140.0 + tone.brightness * 600.0).clamp(1_400.0, 12_000.0),
+    );
+    let mut stab_low = OnePoleLowpass::new(
+        sample_rate,
+        (1_600.0 + register as f32 * 180.0 + tone.brightness * 420.0).clamp(400.0, 7_000.0),
+    );
+    let mut stab_high = OnePoleHighpass::new(
+        sample_rate,
+        (140.0 + register as f32 * 24.0).clamp(40.0, 1_100.0),
+    );
 
     for i in 0..len {
         let out = start + i;
@@ -267,35 +318,35 @@ pub(crate) fn render_techno_pulse(
         let value = match voice % 3 {
             0 => {
                 let base = (42.0 + register as f32 * 5.0) * tone.brightness.max(0.4);
-                let pitch_drop = 1.0 + (-t * 34.0).exp() * (2.3 + timbre * 0.05);
-                let phase = t * base * pitch_drop * std::f32::consts::TAU;
-                let body = phase.sin();
-                let sub = (phase * 0.5).sin() * 0.55;
-                let click = (-t * 120.0).exp() * (noise + (t * 7_000.0).sin() * 0.25);
-                let env = (-t * (13.0 / tone.sustain)).exp();
-                (body + sub) * env * 1.35 + click * (0.16 + tone.roughness * 0.03)
+                let freq = base * pitch_drop(t, 2.3 + timbre * 0.05, 34.0);
+                let body = sine_hz(t, freq);
+                let sub = sine_hz(t, freq * 0.5) * 0.55;
+                let click = hat_high.process(noise + sine_hz(t, 7_000.0) * 0.25);
+                let env = decay_env(t, 13.0, tone.sustain);
+                kick_low.process((body + sub).tanh()) * env * 1.34
+                    + click * transient_env(t, 125.0) * (0.14 + tone.roughness * 0.04)
             }
             1 => {
                 let hat_rate = 7_500.0 + timbre * 320.0 + tone.brightness * 900.0;
-                let ring = (t * hat_rate * std::f32::consts::TAU).sin().signum() * 0.12;
+                let ring = sine_hz(t, hat_rate).signum() * 0.10;
                 let gate = if ((t * (130.0 + timbre * 8.0)) as usize) % 2 == 0 {
                     1.0
                 } else {
                     0.35
                 };
-                let env = (-t * ((40.0 + timbre * 2.0) / tone.sustain)).exp();
-                (noise * (0.82 + tone.roughness * 0.14) + ring) * env * gate
+                let env = decay_env(t, 40.0 + timbre * 2.0, tone.sustain);
+                let hat_noise = hat_high.process(noise) * (0.82 + tone.roughness * 0.14);
+                (hat_noise + ring) * env * gate
             }
             _ => {
                 let stab_freq = (95.0 + register as f32 * 22.0 + timbre * 8.0) * tone.brightness;
                 let detune = 1.004 + tone.roughness * 0.0015;
-                let osc_a = (t * stab_freq * std::f32::consts::TAU).sin();
-                let osc_b = (t * stab_freq * detune * 1.99 * std::f32::consts::TAU).sin() * 0.48;
-                let chord = (osc_a + osc_b).tanh();
-                let filter = (t * stab_freq * 3.0 * std::f32::consts::TAU).sin() * 0.10;
-                let attack = (t / 0.01).min(1.0);
-                let env = attack * (-t * (7.5 / tone.sustain)).exp();
-                (chord + filter + noise * 0.04 * tone.roughness) * env * 0.95
+                let osc_a = sine_hz(t, stab_freq);
+                let osc_b = sine_hz(t, stab_freq * detune * 1.99) * 0.48;
+                let filter = sine_hz(t, stab_freq * 3.0) * 0.10;
+                let chord = stab_high.process(stab_low.process((osc_a + osc_b + filter).tanh()));
+                let env = attack_decay_env(t, 0.01, 7.5, tone.sustain);
+                (chord + noise * 0.035 * tone.roughness) * env * 0.95
             }
         };
 
@@ -317,6 +368,14 @@ pub(crate) fn render_broken_radio(
     let len = ((duration + 0.45 * tone.sustain) * sample_rate as f32) as usize;
     let mut state = 0x6d2b_79f5_u32 ^ start as u32 ^ ((voice as u32) << 16);
     let carrier = (300.0 + register as f32 * 95.0 + timbre * 41.0) * tone.brightness;
+    let mut hiss_high = OnePoleHighpass::new(
+        sample_rate,
+        (2_400.0 + timbre * 160.0 + tone.brightness * 500.0).clamp(900.0, 11_000.0),
+    );
+    let mut body_low = OnePoleLowpass::new(
+        sample_rate,
+        (1_100.0 + register as f32 * 140.0 + tone.brightness * 260.0).clamp(250.0, 5_500.0),
+    );
 
     for i in 0..len {
         let out = start + i;
@@ -324,10 +383,7 @@ pub(crate) fn render_broken_radio(
             break;
         }
         let t = i as f32 / sample_rate as f32;
-        state ^= state << 13;
-        state ^= state >> 17;
-        state ^= state << 5;
-        let noise = ((state & 0xffff) as f32 / 32_768.0) - 1.0;
+        let noise = noise_step(&mut state);
         let gate = if ((t * (11.0 + timbre * 4.0 + tone.roughness * 5.0)) as usize + voice) % 2 == 0
         {
             1.0
@@ -336,9 +392,11 @@ pub(crate) fn render_broken_radio(
         };
         let crush_steps = (14.0 - tone.roughness * 4.0).clamp(3.0, 24.0);
         let crushed = (noise * crush_steps).round() / crush_steps;
-        let radio_tone = (t * carrier * std::f32::consts::TAU).sin().signum() * 0.35;
-        let env = (-t * (5.0 / tone.sustain)).exp();
-        samples[out] += (crushed * 0.65 + radio_tone) * gate * env * amp;
+        let hiss = hiss_high.process(crushed) * 0.65;
+        let radio_tone = body_low.process(sine_hz(t, carrier).signum() * 0.35);
+        let glitch = hiss_high.process(noise * sine_hz(t, carrier * 0.5)) * transient_env(t, 22.0);
+        let env = decay_env(t, 5.0, tone.sustain);
+        samples[out] += (hiss + radio_tone + glitch * 0.35) * gate * env * amp;
     }
 }
 

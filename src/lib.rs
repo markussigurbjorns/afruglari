@@ -12,13 +12,16 @@ pub use constraints::{
     MaxCount, MaxRun, MinCount, MinDensityWindow, MoreTrueThan, PhaseResponse, SlowChange,
 };
 pub use csp::{Conflict, Constraint, Domain, Engine, Value, VarId, solve, solve_with_seed};
-pub use grid::{Event, Grid, Param, events_from_grid};
+pub use grid::{
+    Event, EventDurationMode, Grid, Param, events_from_grid, events_from_grid_with_durations,
+};
 pub use metadata::{GenerationMetadata, MetadataFilter, ScanEntry, scan_metadata};
 pub use presets::{PiecePreset, example_piece, piece_from_preset, preset_names};
 pub use render::{
-    RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, parse_render_mode,
-    render_events_to_wav, render_events_to_wav_with_automation, render_events_to_wav_with_sections,
-    render_mode_name, render_preset,
+    RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice,
+    parse_event_duration_mode, parse_render_mode, render_events_to_wav,
+    render_events_to_wav_with_automation, render_events_to_wav_with_sections, render_mode_name,
+    render_preset,
 };
 pub use workflow::{
     ConstraintConfig, GenerateError, GenerateResult, GenerationConfig, PieceConfig, SectionConfig,

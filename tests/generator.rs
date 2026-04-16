@@ -1,9 +1,9 @@
 use afruglari::{
-    AntiRepeatWindow, Constraint, DifferentAdjacent, Domain, Event, ExactCount, Implication,
-    Literal, MaxCount, MaxRun, MinCount, MinDensityWindow, Param, PhaseResponse, PieceConfig,
-    PiecePreset, RenderConfig, RenderMode, SlowChange, Value, VarId, events_from_grid,
-    example_piece, generate_batch_from_config, generate_one, piece_from_preset,
-    render_events_to_wav, scan_metadata, solve, solve_with_seed,
+    AntiRepeatWindow, Constraint, DifferentAdjacent, Domain, Event, EventDurationMode, ExactCount,
+    Grid, Implication, Literal, MaxCount, MaxRun, MinCount, MinDensityWindow, Param, PhaseResponse,
+    PieceConfig, PiecePreset, RenderConfig, RenderMode, SlowChange, Value, VarId, events_from_grid,
+    events_from_grid_with_durations, example_piece, generate_batch_from_config, generate_one,
+    piece_from_preset, render_events_to_wav, scan_metadata, solve, solve_with_seed,
 };
 
 #[test]
@@ -204,6 +204,47 @@ fn example_piece_solves_and_satisfies_structural_checks() {
 }
 
 #[test]
+fn merged_event_durations_combine_adjacent_matching_steps() {
+    let grid = Grid::new(1, 4);
+    let mut engine = afruglari::Engine::new(grid.domains(4, 4, 4));
+
+    for step in 0..3 {
+        engine
+            .assign(grid.var(0, step, Param::Active), Value::Bool(true))
+            .unwrap();
+        engine
+            .assign(grid.var(0, step, Param::Register), Value::Int(2))
+            .unwrap();
+        engine
+            .assign(grid.var(0, step, Param::Timbre), Value::Int(1))
+            .unwrap();
+        engine
+            .assign(grid.var(0, step, Param::Intensity), Value::Int(3))
+            .unwrap();
+    }
+    engine
+        .assign(grid.var(0, 3, Param::Active), Value::Bool(true))
+        .unwrap();
+    engine
+        .assign(grid.var(0, 3, Param::Register), Value::Int(2))
+        .unwrap();
+    engine
+        .assign(grid.var(0, 3, Param::Timbre), Value::Int(2))
+        .unwrap();
+    engine
+        .assign(grid.var(0, 3, Param::Intensity), Value::Int(3))
+        .unwrap();
+
+    let events =
+        events_from_grid_with_durations(&engine, &grid, EventDurationMode::MergeAdjacent, 8);
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].step, 0);
+    assert_eq!(events[0].duration_steps, 3);
+    assert_eq!(events[1].step, 3);
+    assert_eq!(events[1].duration_steps, 1);
+}
+
+#[test]
 fn renderer_writes_a_valid_wav_file() {
     let path = std::env::temp_dir().join("afruglari-renderer-test.wav");
     let events = vec![Event {
@@ -323,6 +364,9 @@ fn config_parser_accepts_piece_and_render_sections() {
         pump_amount = 0.35
         pump_release = 0.22
         pump_lowpass_hz = 140.0
+        pump_key_voice = 0
+        event_duration_mode = "merge"
+        max_event_duration_steps = 6
         drive = 1.3
         brightness = 1.4
         roughness = 0.7
@@ -375,6 +419,12 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.render.pump_amount, 0.35);
     assert_eq!(config.render.pump_release, 0.22);
     assert_eq!(config.render.pump_lowpass_hz, 140.0);
+    assert_eq!(config.render.pump_key_voice, Some(0));
+    assert_eq!(
+        config.render.event_duration_mode,
+        EventDurationMode::MergeAdjacent
+    );
+    assert_eq!(config.render.max_event_duration_steps, 6);
     assert_eq!(config.render.drive, 1.3);
     assert_eq!(config.render.brightness, 1.4);
     assert_eq!(config.render.roughness, 0.7);

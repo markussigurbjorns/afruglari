@@ -19,6 +19,7 @@ delay_seconds = 0.25
 pump_amount = 0.52
 pump_release = 0.18
 pump_lowpass_hz = 135.0
+pump_key_voice = 0
 accent_pattern = "four-on-floor"
 accent_amount = 0.72
 drive = 1.36

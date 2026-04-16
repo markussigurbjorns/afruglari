@@ -1,12 +1,12 @@
 use crate::builder::build_piece;
 use crate::csp::solve_with_seed;
-use crate::grid::{Event, events_from_grid};
+use crate::grid::{Event, events_from_grid_with_durations};
 use crate::metadata::GenerationMetadata;
 use crate::presets::PiecePreset;
 use crate::render::{
     AccentPattern, RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice,
-    parse_accent_pattern, parse_render_mode, render_events_to_wav_with_automation,
-    render_mode_name, render_preset,
+    parse_accent_pattern, parse_event_duration_mode, parse_render_mode,
+    render_events_to_wav_with_automation, render_mode_name, render_preset,
 };
 use std::collections::BTreeMap;
 use std::fmt;
@@ -393,6 +393,18 @@ impl GenerationConfig {
                 "render.accent_amount" | "accent_amount" => {
                     config.render.accent_amount = parse_f32(value)?;
                 }
+                "render.event_duration_mode" | "event_duration_mode" => {
+                    config.render.event_duration_mode =
+                        parse_event_duration_mode(&parse_string(value)?).ok_or_else(|| {
+                            GenerateError::Config(format!(
+                                "unknown event_duration_mode '{}'",
+                                parse_string(value).unwrap_or_default()
+                            ))
+                        })?;
+                }
+                "render.max_event_duration_steps" | "max_event_duration_steps" => {
+                    config.render.max_event_duration_steps = parse_usize(value)?;
+                }
                 "render.pump_amount" | "pump_amount" => {
                     config.render.pump_amount = parse_f32(value)?;
                 }
@@ -401,6 +413,9 @@ impl GenerationConfig {
                 }
                 "render.pump_lowpass_hz" | "pump_lowpass_hz" => {
                     config.render.pump_lowpass_hz = parse_f32(value)?;
+                }
+                "render.pump_key_voice" | "pump_key_voice" => {
+                    config.render.pump_key_voice = parse_pump_key_voice(value)?;
                 }
                 "render.drive" | "drive" => {
                     config.render.drive = parse_f32(value)?;
@@ -477,7 +492,15 @@ pub fn generate_one(config: &GenerationConfig) -> Result<GenerateResult, Generat
         });
     }
 
-    let events = events_from_grid(&engine, &grid);
+    let events = split_events_at_section_boundaries(
+        events_from_grid_with_durations(
+            &engine,
+            &grid,
+            config.render.event_duration_mode,
+            config.render.max_event_duration_steps,
+        ),
+        &config.sections,
+    );
     ensure_parent_dir(&config.output)?;
     let render_voices = resolve_render_voices(config)?;
     let render_sections = resolve_render_sections(config)?;
@@ -674,6 +697,47 @@ fn apply_explicit_render_fields(
     }
 }
 
+fn split_events_at_section_boundaries(
+    events: Vec<Event>,
+    sections: &[SectionConfig],
+) -> Vec<Event> {
+    if sections.is_empty() {
+        return events;
+    }
+
+    let mut boundaries = sections
+        .iter()
+        .map(|section| section.end)
+        .collect::<Vec<_>>();
+    boundaries.sort_unstable();
+    boundaries.dedup();
+
+    let mut split = Vec::with_capacity(events.len());
+    for event in events {
+        let mut step = event.step;
+        let event_end = event.step + event.duration_steps;
+
+        while step < event_end {
+            let next_boundary = boundaries
+                .iter()
+                .copied()
+                .find(|boundary| *boundary > step && *boundary < event_end)
+                .unwrap_or(event_end);
+            split.push(Event {
+                voice: event.voice,
+                step,
+                duration_steps: next_boundary - step,
+                register: event.register,
+                timbre: event.timbre,
+                intensity: event.intensity,
+            });
+            step = next_boundary;
+        }
+    }
+
+    split
+}
+
 fn voice_render_summaries(config: &GenerationConfig) -> Vec<String> {
     config
         .voice_renders
@@ -720,7 +784,10 @@ fn render_override_summary(preset: Option<&str>, overrides: RenderOverride) -> S
         fields.push(format!("stereo_width={stereo_width:.2}"));
     }
     if let Some(accent_pattern) = &overrides.accent_pattern {
-        fields.push(format!("accent_pattern={}", accent_pattern_name(accent_pattern)));
+        fields.push(format!(
+            "accent_pattern={}",
+            accent_pattern_name(accent_pattern)
+        ));
     }
     if let Some(accent_amount) = overrides.accent_amount {
         fields.push(format!("accent_amount={accent_amount:.2}"));
@@ -823,6 +890,18 @@ fn parse_accent(value: &str, context: &str) -> Result<AccentPattern, GenerateErr
             "{context} expects a named pattern or space/comma separated percentages"
         ))
     })
+}
+
+fn parse_pump_key_voice(value: &str) -> Result<Option<usize>, GenerateError> {
+    let parsed = parse_string(value)?;
+    match parsed.as_str() {
+        "none" | "master" => Ok(None),
+        _ => parsed.parse::<usize>().map(Some).map_err(|_| {
+            GenerateError::Config(format!(
+                "pump_key_voice must be 'none', 'master', or a voice index, got '{parsed}'"
+            ))
+        }),
+    }
 }
 
 fn parse_string(value: &str) -> Result<String, GenerateError> {

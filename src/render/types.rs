@@ -1,3 +1,5 @@
+use crate::grid::EventDurationMode;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct RenderConfig {
     pub sample_rate: u32,
@@ -11,8 +13,11 @@ pub struct RenderConfig {
     pub pump_amount: f32,
     pub pump_release: f32,
     pub pump_lowpass_hz: f32,
+    pub pump_key_voice: Option<usize>,
     pub accent_pattern: AccentPattern,
     pub accent_amount: f32,
+    pub event_duration_mode: EventDurationMode,
+    pub max_event_duration_steps: usize,
     pub drive: f32,
     pub brightness: f32,
     pub roughness: f32,
@@ -105,6 +110,14 @@ pub fn parse_accent_pattern(value: &str) -> Option<AccentPattern> {
         "offbeat" => Some(AccentPattern::Steps(vec![72, 112, 72, 112])),
         "backbeat" => Some(AccentPattern::Steps(vec![100, 72, 118, 74])),
         other => parse_custom_accent_pattern(other),
+    }
+}
+
+pub fn parse_event_duration_mode(value: &str) -> Option<EventDurationMode> {
+    match value {
+        "single" | "single-step" | "step" => Some(EventDurationMode::SingleStep),
+        "merge" | "merge-adjacent" | "legato" => Some(EventDurationMode::MergeAdjacent),
+        _ => None,
     }
 }
 
@@ -228,8 +241,11 @@ impl Default for RenderConfig {
             pump_amount: 0.0,
             pump_release: 0.18,
             pump_lowpass_hz: 180.0,
+            pump_key_voice: None,
             accent_pattern: AccentPattern::Constant,
             accent_amount: 0.0,
+            event_duration_mode: EventDurationMode::SingleStep,
+            max_event_duration_steps: 1,
             drive: 1.15,
             brightness: 1.0,
             roughness: 1.0,

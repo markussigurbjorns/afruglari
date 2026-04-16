@@ -1,3 +1,4 @@
+mod dsp;
 mod mix;
 mod synth;
 mod types;
@@ -13,7 +14,8 @@ use synth::{
 };
 pub use types::{
     AccentPattern, RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice,
-    parse_accent_pattern, parse_render_mode, render_mode_name, render_preset,
+    parse_accent_pattern, parse_event_duration_mode, parse_render_mode, render_mode_name,
+    render_preset,
 };
 use wav::write_wav_stereo_i16;
 
@@ -46,17 +48,20 @@ pub fn render_events_to_wav_with_automation(
     let total_seconds = (max_step as f32 + 1.0) * config.step_seconds + config.tail_seconds;
     let mut samples =
         vec![StereoSample::default(); (total_seconds * sample_rate as f32) as usize + 1];
+    let mut pump_key_signal = config.pump_key_voice.map(|_| vec![0.0_f32; samples.len()]);
 
     for event in events {
         render_event(
             event,
             &mut samples,
             render_config_for_event(&config, voices, sections, event),
+            pump_key_signal.as_deref_mut(),
+            config.pump_key_voice,
         );
     }
 
     apply_delay(&mut samples, &config);
-    apply_pump(&mut samples, &config);
+    apply_pump(&mut samples, &config, pump_key_signal.as_deref());
     soft_limit(&mut samples, config.drive);
     write_wav_stereo_i16(path, sample_rate, &samples)
 }
@@ -80,7 +85,13 @@ fn render_config_for_event(
     config
 }
 
-fn render_event(event: &Event, samples: &mut [StereoSample], config: RenderConfig) {
+fn render_event(
+    event: &Event,
+    samples: &mut [StereoSample],
+    config: RenderConfig,
+    pump_key_signal: Option<&mut [f32]>,
+    pump_key_voice: Option<usize>,
+) {
     let start = (event.step as f32 * config.step_seconds * config.sample_rate as f32) as usize;
     let duration = event.duration_steps as f32 * config.step_seconds;
     let register = event.register.unwrap_or(0);
@@ -223,5 +234,16 @@ fn render_event(event: &Event, samples: &mut [StereoSample], config: RenderConfi
     }
 
     soft_limit_mono(&mut mono, config.drive);
+    if let (Some(key_signal), Some(key_voice)) = (pump_key_signal, pump_key_voice) {
+        if event.voice == key_voice {
+            for (index, sample) in mono.iter().copied().enumerate() {
+                let out = start + index;
+                if out >= key_signal.len() {
+                    break;
+                }
+                key_signal[out] += sample;
+            }
+        }
+    }
     mix_mono_event(samples, start, &mono, event.voice, config.stereo_width);
 }

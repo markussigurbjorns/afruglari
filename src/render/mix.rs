@@ -44,7 +44,11 @@ pub(crate) fn apply_delay(samples: &mut [StereoSample], config: &RenderConfig) {
     }
 }
 
-pub(crate) fn apply_pump(samples: &mut [StereoSample], config: &RenderConfig) {
+pub(crate) fn apply_pump(
+    samples: &mut [StereoSample],
+    config: &RenderConfig,
+    key_signal: Option<&[f32]>,
+) {
     let amount = config.pump_amount.clamp(0.0, 1.0);
     if amount <= 0.0 {
         return;
@@ -58,9 +62,11 @@ pub(crate) fn apply_pump(samples: &mut [StereoSample], config: &RenderConfig) {
     let mut envelope = 0.0_f32;
     let mut low = 0.0_f32;
 
-    for sample in samples {
-        let mono = (sample.left + sample.right) * 0.5;
-        low += (mono - low) * lowpass_coeff;
+    for (index, sample) in samples.iter_mut().enumerate() {
+        let detector = key_signal
+            .and_then(|signal| signal.get(index).copied())
+            .unwrap_or((sample.left + sample.right) * 0.5);
+        low += (detector - low) * lowpass_coeff;
         let trigger = low.abs().min(1.0);
         let target = trigger * trigger * amount;
         envelope = (envelope * release_coeff).max(target);
