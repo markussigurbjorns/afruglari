@@ -418,8 +418,21 @@ fn choose_var(engine: &Engine, seed: u64) -> Option<VarId> {
         .iter()
         .enumerate()
         .filter(|(_, domain)| domain.size() > 1)
-        .min_by_key(|(index, domain)| (domain.size(), mix(seed ^ *index as u64)))
+        .min_by_key(|(index, domain)| {
+            (
+                var_branch_priority(*index),
+                domain.size(),
+                mix(seed ^ *index as u64),
+            )
+        })
         .map(|(index, _)| VarId(index))
+}
+
+fn var_branch_priority(index: usize) -> usize {
+    match index % 4 {
+        0 => 0,
+        _ => 1,
+    }
 }
 
 fn ordered_values(var: VarId, domain: &Domain, seed: u64) -> Vec<Value> {
