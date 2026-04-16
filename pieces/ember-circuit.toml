@@ -1,0 +1,144 @@
+[piece]
+voices = 3
+steps = 24
+registers = 6
+timbres = 8
+intensities = 6
+seed = 922
+output = "target/pieces/ember-circuit-922.wav"
+render_mode = "drone"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.72
+tail_seconds = 6.0
+stereo_width = 0.82
+delay_mix = 0.16
+delay_feedback = 0.28
+delay_seconds = 0.41
+pump_amount = 0.24
+pump_release = 0.22
+pump_lowpass_hz = 145.0
+accent_pattern = "four-on-floor"
+accent_amount = 0.38
+drive = 1.20
+brightness = 0.78
+roughness = 1.02
+sustain = 2.80
+
+[[section]]
+name = "mist"
+start = 0
+end = 6
+
+[[section]]
+name = "machinedrift"
+start = 6
+end = 13
+
+[[section]]
+name = "pressure"
+start = 13
+end = 19
+
+[[section]]
+name = "afterheat"
+start = 19
+end = 24
+
+[[voice_render]]
+voice = 0
+preset = "distant-drone"
+mode = "drone"
+brightness = 0.54
+roughness = 0.58
+sustain = 4.60
+
+[[voice_render]]
+voice = 1
+mode = "impact-kit"
+brightness = 0.96
+roughness = 1.18
+sustain = 0.90
+accent_pattern = "backbeat"
+accent_amount = 0.42
+
+[[voice_render]]
+voice = 2
+mode = "techno-pulse"
+brightness = 0.92
+roughness = 1.08
+sustain = 1.08
+accent_pattern = "offbeat"
+accent_amount = 0.34
+
+[[section_render]]
+section = "mist"
+mode = "drone"
+brightness = 0.46
+roughness = 0.52
+sustain = 5.00
+
+[[section_render]]
+section = "machinedrift"
+mode = "drone"
+accent_pattern = "four-on-floor"
+accent_amount = 0.30
+brightness = 0.72
+roughness = 0.92
+sustain = 3.10
+
+[[section_render]]
+section = "pressure"
+mode = "techno-pulse"
+accent_pattern = "100 68 92 74"
+accent_amount = 0.52
+brightness = 1.02
+roughness = 1.22
+sustain = 1.20
+drive = 1.30
+
+[[section_render]]
+section = "afterheat"
+mode = "drone"
+accent_pattern = "offbeat"
+accent_amount = 0.22
+brightness = 0.58
+roughness = 0.74
+sustain = 4.20
+
+[[constraint]]
+type = "exact-count"
+param = "active"
+value = true
+density = 0.24
+
+[[constraint]]
+type = "max-run"
+voice = 0
+param = "active"
+len = 4
+
+[[constraint]]
+type = "max-run"
+voice = 1
+param = "active"
+len = 3
+
+[[constraint]]
+type = "max-run"
+voice = 2
+param = "active"
+len = 3
+
+[[constraint]]
+type = "min-density-window"
+param = "active"
+window = 5
+min = 1
+
+[[constraint]]
+type = "slow-change"
+voice = 0
+param = "register"
+window = 3
