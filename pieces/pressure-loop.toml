@@ -1,0 +1,137 @@
+[piece]
+voices = 3
+steps = 20
+registers = 5
+timbres = 6
+intensities = 5
+seed = 701
+output = "target/pieces/pressure-loop-701.wav"
+render_mode = "impact-kit"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.18
+tail_seconds = 2.6
+stereo_width = 0.76
+delay_mix = 0.10
+delay_feedback = 0.18
+delay_seconds = 0.24
+drive = 1.30
+brightness = 0.92
+roughness = 1.20
+sustain = 0.78
+
+[[section]]
+name = "grid"
+start = 0
+end = 5
+
+[[section]]
+name = "lock"
+start = 5
+end = 12
+
+[[section]]
+name = "fill"
+start = 12
+end = 16
+
+[[section]]
+name = "release"
+start = 16
+end = 20
+
+[[voice_render]]
+voice = 0
+preset = "low-ritual"
+mode = "impact-kit"
+brightness = 0.62
+roughness = 0.80
+sustain = 1.20
+
+[[voice_render]]
+voice = 1
+preset = "metal-splinters"
+mode = "impact-kit"
+brightness = 1.02
+roughness = 1.18
+sustain = 0.68
+
+[[voice_render]]
+voice = 2
+preset = "radio-wound"
+mode = "impact-kit"
+brightness = 1.10
+roughness = 1.55
+sustain = 0.52
+
+[[section_render]]
+section = "grid"
+mode = "impact-kit"
+brightness = 0.82
+roughness = 0.90
+sustain = 0.90
+
+[[section_render]]
+section = "lock"
+mode = "impact-kit"
+brightness = 0.94
+roughness = 1.05
+sustain = 0.74
+
+[[section_render]]
+section = "fill"
+mode = "impact-kit"
+brightness = 1.12
+roughness = 1.45
+sustain = 0.55
+drive = 1.38
+
+[[section_render]]
+section = "release"
+mode = "impact-kit"
+brightness = 0.78
+roughness = 0.88
+sustain = 0.96
+
+[[constraint]]
+type = "exact-count"
+param = "active"
+value = true
+density = 0.32
+
+[[constraint]]
+type = "max-run"
+voice = 0
+param = "active"
+len = 2
+
+[[constraint]]
+type = "max-run"
+voice = 1
+param = "active"
+len = 3
+
+[[constraint]]
+type = "max-run"
+voice = 2
+param = "active"
+len = 1
+
+[[constraint]]
+type = "min-density-window"
+param = "active"
+window = 4
+min = 1
+
+[[constraint]]
+type = "at-least-collisions"
+voice_a = 0
+voice_b = 1
+count = 3
+
+[[constraint]]
+type = "slow-change"
+voice = 0
+param = "register"
+window = 3
