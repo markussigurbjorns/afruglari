@@ -318,8 +318,11 @@ fn config_parser_accepts_piece_and_render_sections() {
         delay_mix = 0.2
         delay_feedback = 0.4
         delay_seconds = 0.5
+        accent_pattern = "four-on-floor"
+        accent_amount = 0.6
         pump_amount = 0.35
         pump_release = 0.22
+        pump_lowpass_hz = 140.0
         drive = 1.3
         brightness = 1.4
         roughness = 0.7
@@ -334,6 +337,8 @@ fn config_parser_accepts_piece_and_render_sections() {
         section = "rupture"
         preset = "static-ash"
         stereo_width = 0.9
+        accent_pattern = "100 60 100 75"
+        accent_amount = 0.8
         drive = 1.7
         brightness = 1.8
         roughness = 2.2
@@ -343,6 +348,8 @@ fn config_parser_accepts_piece_and_render_sections() {
         voice = 1
         preset = "glass-insects"
         stereo_width = 0.3
+        accent_pattern = "offbeat"
+        accent_amount = 0.4
         drive = 1.1
         brightness = 0.9
         roughness = 1.5
@@ -362,8 +369,12 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.render.delay_mix, 0.2);
     assert_eq!(config.render.delay_feedback, 0.4);
     assert_eq!(config.render.delay_seconds, 0.5);
+    assert_eq!(config.render.accent_pattern.value_at(0), 1.0);
+    assert_eq!(config.render.accent_pattern.value_at(1), 0.62);
+    assert_eq!(config.render.accent_amount, 0.6);
     assert_eq!(config.render.pump_amount, 0.35);
     assert_eq!(config.render.pump_release, 0.22);
+    assert_eq!(config.render.pump_lowpass_hz, 140.0);
     assert_eq!(config.render.drive, 1.3);
     assert_eq!(config.render.brightness, 1.4);
     assert_eq!(config.render.roughness, 0.7);
@@ -376,6 +387,14 @@ fn config_parser_accepts_piece_and_render_sections() {
     );
     assert_eq!(config.section_renders[0].mode, None);
     assert_eq!(config.section_renders[0].stereo_width, Some(0.9));
+    assert_eq!(
+        config.section_renders[0]
+            .accent_pattern
+            .as_ref()
+            .map(|pattern| pattern.value_at(1)),
+        Some(0.6)
+    );
+    assert_eq!(config.section_renders[0].accent_amount, Some(0.8));
     assert_eq!(config.section_renders[0].drive, Some(1.7));
     assert_eq!(config.section_renders[0].brightness, Some(1.8));
     assert_eq!(config.section_renders[0].roughness, Some(2.2));
@@ -388,6 +407,14 @@ fn config_parser_accepts_piece_and_render_sections() {
     );
     assert_eq!(config.voice_renders[0].mode, None);
     assert_eq!(config.voice_renders[0].stereo_width, Some(0.3));
+    assert_eq!(
+        config.voice_renders[0]
+            .accent_pattern
+            .as_ref()
+            .map(|pattern| pattern.value_at(1)),
+        Some(1.12)
+    );
+    assert_eq!(config.voice_renders[0].accent_amount, Some(0.4));
     assert_eq!(config.voice_renders[0].drive, Some(1.1));
     assert_eq!(config.voice_renders[0].brightness, Some(0.9));
     assert_eq!(config.voice_renders[0].roughness, Some(1.5));

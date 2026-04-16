@@ -8,7 +8,7 @@ pub(crate) struct ToneControls {
 }
 
 impl ToneControls {
-    pub(crate) fn from_config(config: RenderConfig) -> Self {
+    pub(crate) fn from_config(config: &RenderConfig) -> Self {
         Self {
             brightness: config.brightness.clamp(0.1, 4.0),
             roughness: config.roughness.clamp(0.0, 4.0),

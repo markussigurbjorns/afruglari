@@ -4,8 +4,9 @@ use crate::grid::{Event, events_from_grid};
 use crate::metadata::GenerationMetadata;
 use crate::presets::PiecePreset;
 use crate::render::{
-    RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, parse_render_mode,
-    render_events_to_wav_with_automation, render_mode_name, render_preset,
+    AccentPattern, RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice,
+    parse_accent_pattern, parse_render_mode, render_events_to_wav_with_automation,
+    render_mode_name, render_preset,
 };
 use std::collections::BTreeMap;
 use std::fmt;
@@ -62,6 +63,8 @@ pub struct SectionRenderConfig {
     pub preset: Option<String>,
     pub mode: Option<RenderMode>,
     pub stereo_width: Option<f32>,
+    pub accent_pattern: Option<AccentPattern>,
+    pub accent_amount: Option<f32>,
     pub drive: Option<f32>,
     pub brightness: Option<f32>,
     pub roughness: Option<f32>,
@@ -74,6 +77,8 @@ pub struct VoiceRenderConfig {
     pub preset: Option<String>,
     pub mode: Option<RenderMode>,
     pub stereo_width: Option<f32>,
+    pub accent_pattern: Option<AccentPattern>,
+    pub accent_amount: Option<f32>,
     pub drive: Option<f32>,
     pub brightness: Option<f32>,
     pub roughness: Option<f32>,
@@ -264,6 +269,11 @@ impl GenerationConfig {
                             })?);
                     }
                     "stereo_width" => section_render.stereo_width = Some(parse_f32(value)?),
+                    "accent_pattern" => {
+                        section_render.accent_pattern =
+                            Some(parse_accent(value, "section_render accent_pattern")?)
+                    }
+                    "accent_amount" => section_render.accent_amount = Some(parse_f32(value)?),
                     "drive" => section_render.drive = Some(parse_f32(value)?),
                     "brightness" => section_render.brightness = Some(parse_f32(value)?),
                     "roughness" => section_render.roughness = Some(parse_f32(value)?),
@@ -298,6 +308,11 @@ impl GenerationConfig {
                             })?);
                     }
                     "stereo_width" => voice_render.stereo_width = Some(parse_f32(value)?),
+                    "accent_pattern" => {
+                        voice_render.accent_pattern =
+                            Some(parse_accent(value, "voice_render accent_pattern")?)
+                    }
+                    "accent_amount" => voice_render.accent_amount = Some(parse_f32(value)?),
                     "drive" => voice_render.drive = Some(parse_f32(value)?),
                     "brightness" => voice_render.brightness = Some(parse_f32(value)?),
                     "roughness" => voice_render.roughness = Some(parse_f32(value)?),
@@ -372,11 +387,20 @@ impl GenerationConfig {
                 "render.delay_seconds" | "delay_seconds" => {
                     config.render.delay_seconds = parse_f32(value)?;
                 }
+                "render.accent_pattern" | "accent_pattern" => {
+                    config.render.accent_pattern = parse_accent(value, "accent_pattern")?;
+                }
+                "render.accent_amount" | "accent_amount" => {
+                    config.render.accent_amount = parse_f32(value)?;
+                }
                 "render.pump_amount" | "pump_amount" => {
                     config.render.pump_amount = parse_f32(value)?;
                 }
                 "render.pump_release" | "pump_release" => {
                     config.render.pump_release = parse_f32(value)?;
+                }
+                "render.pump_lowpass_hz" | "pump_lowpass_hz" => {
+                    config.render.pump_lowpass_hz = parse_f32(value)?;
                 }
                 "render.drive" | "drive" => {
                     config.render.drive = parse_f32(value)?;
@@ -460,7 +484,7 @@ pub fn generate_one(config: &GenerationConfig) -> Result<GenerateResult, Generat
     render_events_to_wav_with_automation(
         &events,
         &config.output,
-        config.render,
+        config.render.clone(),
         &render_voices,
         &render_sections,
     )?;
@@ -577,6 +601,8 @@ fn section_render_overrides(
         &mut overrides,
         section_render.mode,
         section_render.stereo_width,
+        section_render.accent_pattern.as_ref(),
+        section_render.accent_amount,
         section_render.drive,
         section_render.brightness,
         section_render.roughness,
@@ -593,6 +619,8 @@ fn voice_render_overrides(
         &mut overrides,
         voice_render.mode,
         voice_render.stereo_width,
+        voice_render.accent_pattern.as_ref(),
+        voice_render.accent_amount,
         voice_render.drive,
         voice_render.brightness,
         voice_render.roughness,
@@ -613,6 +641,8 @@ fn apply_explicit_render_fields(
     overrides: &mut RenderOverride,
     mode: Option<RenderMode>,
     stereo_width: Option<f32>,
+    accent_pattern: Option<&AccentPattern>,
+    accent_amount: Option<f32>,
     drive: Option<f32>,
     brightness: Option<f32>,
     roughness: Option<f32>,
@@ -623,6 +653,12 @@ fn apply_explicit_render_fields(
     }
     if stereo_width.is_some() {
         overrides.stereo_width = stereo_width;
+    }
+    if let Some(accent_pattern) = accent_pattern {
+        overrides.accent_pattern = Some(accent_pattern.clone());
+    }
+    if accent_amount.is_some() {
+        overrides.accent_amount = accent_amount;
     }
     if drive.is_some() {
         overrides.drive = drive;
@@ -682,6 +718,12 @@ fn render_override_summary(preset: Option<&str>, overrides: RenderOverride) -> S
     }
     if let Some(stereo_width) = overrides.stereo_width {
         fields.push(format!("stereo_width={stereo_width:.2}"));
+    }
+    if let Some(accent_pattern) = &overrides.accent_pattern {
+        fields.push(format!("accent_pattern={}", accent_pattern_name(accent_pattern)));
+    }
+    if let Some(accent_amount) = overrides.accent_amount {
+        fields.push(format!("accent_amount={accent_amount:.2}"));
     }
     if let Some(drive) = overrides.drive {
         fields.push(format!("drive={drive:.2}"));
@@ -761,6 +803,26 @@ fn piece_name(config: &GenerationConfig) -> &str {
     } else {
         config.preset.name()
     }
+}
+
+fn accent_pattern_name(pattern: &AccentPattern) -> String {
+    match pattern {
+        AccentPattern::Constant => "constant".to_string(),
+        AccentPattern::Steps(values) => values
+            .iter()
+            .map(u8::to_string)
+            .collect::<Vec<_>>()
+            .join("-"),
+    }
+}
+
+fn parse_accent(value: &str, context: &str) -> Result<AccentPattern, GenerateError> {
+    let parsed = parse_string(value)?;
+    parse_accent_pattern(&parsed).ok_or_else(|| {
+        GenerateError::Config(format!(
+            "{context} expects a named pattern or space/comma separated percentages"
+        ))
+    })
 }
 
 fn parse_string(value: &str) -> Result<String, GenerateError> {

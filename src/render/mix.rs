@@ -27,7 +27,7 @@ pub(crate) fn mix_mono_event(
     }
 }
 
-pub(crate) fn apply_delay(samples: &mut [StereoSample], config: RenderConfig) {
+pub(crate) fn apply_delay(samples: &mut [StereoSample], config: &RenderConfig) {
     let delay_samples = (config.delay_seconds * config.sample_rate as f32) as usize;
     if delay_samples == 0 || config.delay_mix <= 0.0 {
         return;
@@ -44,7 +44,7 @@ pub(crate) fn apply_delay(samples: &mut [StereoSample], config: RenderConfig) {
     }
 }
 
-pub(crate) fn apply_pump(samples: &mut [StereoSample], config: RenderConfig) {
+pub(crate) fn apply_pump(samples: &mut [StereoSample], config: &RenderConfig) {
     let amount = config.pump_amount.clamp(0.0, 1.0);
     if amount <= 0.0 {
         return;
@@ -52,10 +52,16 @@ pub(crate) fn apply_pump(samples: &mut [StereoSample], config: RenderConfig) {
 
     let release_seconds = config.pump_release.clamp(0.01, 2.0);
     let release_coeff = (-1.0 / (release_seconds * config.sample_rate as f32)).exp();
+    let cutoff_hz = config.pump_lowpass_hz.clamp(30.0, 500.0);
+    let lowpass_coeff =
+        (std::f32::consts::TAU * cutoff_hz / config.sample_rate as f32).clamp(0.0005, 0.25);
     let mut envelope = 0.0_f32;
+    let mut low = 0.0_f32;
 
     for sample in samples {
-        let trigger = sample.left.abs().max(sample.right.abs()).min(1.0);
+        let mono = (sample.left + sample.right) * 0.5;
+        low += (mono - low) * lowpass_coeff;
+        let trigger = low.abs().min(1.0);
         let target = trigger * trigger * amount;
         envelope = (envelope * release_coeff).max(target);
         let gain = (1.0 - envelope).clamp(0.05, 1.0);

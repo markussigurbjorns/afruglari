@@ -12,8 +12,8 @@ use synth::{
     render_noise_organ, render_sub_machine, render_techno_pulse,
 };
 pub use types::{
-    RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, parse_render_mode,
-    render_mode_name, render_preset,
+    AccentPattern, RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice,
+    parse_accent_pattern, parse_render_mode, render_mode_name, render_preset,
 };
 use wav::write_wav_stereo_i16;
 
@@ -51,23 +51,23 @@ pub fn render_events_to_wav_with_automation(
         render_event(
             event,
             &mut samples,
-            render_config_for_event(config, voices, sections, event),
+            render_config_for_event(&config, voices, sections, event),
         );
     }
 
-    apply_delay(&mut samples, config);
-    apply_pump(&mut samples, config);
+    apply_delay(&mut samples, &config);
+    apply_pump(&mut samples, &config);
     soft_limit(&mut samples, config.drive);
     write_wav_stereo_i16(path, sample_rate, &samples)
 }
 
 fn render_config_for_event(
-    base: RenderConfig,
+    base: &RenderConfig,
     voices: &[RenderVoice],
     sections: &[RenderSection],
     event: &Event,
 ) -> RenderConfig {
-    let mut config = base;
+    let mut config = base.clone();
     if let Some(voice) = voices.iter().find(|voice| voice.voice == event.voice) {
         voice.overrides.apply_to(&mut config);
     }
@@ -84,9 +84,10 @@ fn render_event(event: &Event, samples: &mut [StereoSample], config: RenderConfi
     let start = (event.step as f32 * config.step_seconds * config.sample_rate as f32) as usize;
     let duration = event.duration_steps as f32 * config.step_seconds;
     let register = event.register.unwrap_or(0);
-    let amp = 0.08 + event.intensity as f32 * 0.035;
+    let accent = 1.0 + (config.accent_pattern.value_at(event.step) - 1.0) * config.accent_amount;
+    let amp = (0.08 + event.intensity as f32 * 0.035) * accent.clamp(0.25, 2.0);
     let timbre = event.timbre as f32;
-    let tone = ToneControls::from_config(config);
+    let tone = ToneControls::from_config(&config);
     let mut mono = vec![0.0_f32; samples.len().saturating_sub(start)];
 
     match config.mode {

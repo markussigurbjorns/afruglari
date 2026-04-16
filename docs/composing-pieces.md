@@ -73,6 +73,7 @@ delay_feedback = 0.30
 delay_seconds = 0.37
 pump_amount = 0.25
 pump_release = 0.20
+pump_lowpass_hz = 160.0
 drive = 1.2
 brightness = 1.0
 roughness = 1.2
@@ -210,6 +211,7 @@ delay_feedback = 0.30
 delay_seconds = 0.37
 pump_amount = 0.25
 pump_release = 0.20
+pump_lowpass_hz = 160.0
 drive = 1.2
 brightness = 1.0
 roughness = 1.2
@@ -229,6 +231,7 @@ roughness        increases noise, modulation, folding, and gating
 sustain          stretches event tails and envelope decay
 pump_amount      ducking depth of the simple master sidechain effect
 pump_release     how quickly the pump recovers after each trigger
+pump_lowpass_hz  low-end focus for the pump trigger; lower values react more to kicks
 ```
 
 You can override the event-level render settings inside named sections:
