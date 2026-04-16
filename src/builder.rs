@@ -6,6 +6,7 @@ use crate::csp::{Engine, Value};
 use crate::grid::{Grid, Param};
 use crate::presets::piece_from_preset;
 use crate::workflow::{ConstraintConfig, GenerateError, GenerationConfig, PieceConfig};
+use crate::{Implication, Literal};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct StepRange {
@@ -23,11 +24,33 @@ pub(crate) fn build_piece(config: &GenerationConfig) -> Result<(Grid, Engine), G
     let grid = Grid::new(piece.voices, piece.steps);
     let mut engine = Engine::new(grid.domains(piece.registers, piece.timbres, piece.intensities));
 
+    add_inactive_param_defaults(&mut engine, &grid, &piece);
+
     for constraint in &config.constraints {
         add_configured_constraint(&mut engine, &grid, &piece, constraint)?;
     }
 
     Ok((grid, engine))
+}
+
+fn add_inactive_param_defaults(engine: &mut Engine, grid: &Grid, piece: &PieceConfig) {
+    for voice in 0..piece.voices {
+        for step in 0..piece.steps {
+            let inactive = Literal {
+                var: grid.var(voice, step, Param::Active),
+                value: Value::Bool(false),
+            };
+            for param in [Param::Register, Param::Timbre, Param::Intensity] {
+                engine.add_constraint(Implication::new(
+                    inactive,
+                    Literal {
+                        var: grid.var(voice, step, param),
+                        value: Value::Int(0),
+                    },
+                ));
+            }
+        }
+    }
 }
 
 fn add_configured_constraint(
@@ -338,4 +361,45 @@ fn parse_f32(value: &str) -> Result<f32, GenerateError> {
     value
         .parse()
         .map_err(|_| GenerateError::Config(format!("expected float, got '{value}'")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::csp::Value;
+    use crate::workflow::GenerationConfig;
+
+    #[test]
+    fn inactive_cells_force_params_to_zero() {
+        let config = GenerationConfig {
+            piece: Some(PieceConfig {
+                voices: 1,
+                steps: 2,
+                registers: 4,
+                timbres: 4,
+                intensities: 4,
+                sections: Vec::new(),
+            }),
+            ..GenerationConfig::default()
+        };
+
+        let (grid, mut engine) = build_piece(&config).unwrap();
+        engine
+            .assign(grid.var(0, 0, Param::Active), Value::Bool(false))
+            .unwrap();
+        engine.propagate_all().unwrap();
+
+        assert_eq!(
+            engine.value(grid.var(0, 0, Param::Register)),
+            Some(Value::Int(0))
+        );
+        assert_eq!(
+            engine.value(grid.var(0, 0, Param::Timbre)),
+            Some(Value::Int(0))
+        );
+        assert_eq!(
+            engine.value(grid.var(0, 0, Param::Intensity)),
+            Some(Value::Int(0))
+        );
+    }
 }
