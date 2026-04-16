@@ -251,6 +251,7 @@ fn all_render_modes_write_valid_wav_files() {
     for mode in [
         RenderMode::Percussive,
         RenderMode::ImpactKit,
+        RenderMode::TechnoPulse,
         RenderMode::Drone,
         RenderMode::BrokenRadio,
         RenderMode::Metallic,
@@ -317,6 +318,8 @@ fn config_parser_accepts_piece_and_render_sections() {
         delay_mix = 0.2
         delay_feedback = 0.4
         delay_seconds = 0.5
+        pump_amount = 0.35
+        pump_release = 0.22
         drive = 1.3
         brightness = 1.4
         roughness = 0.7
@@ -359,6 +362,8 @@ fn config_parser_accepts_piece_and_render_sections() {
     assert_eq!(config.render.delay_mix, 0.2);
     assert_eq!(config.render.delay_feedback, 0.4);
     assert_eq!(config.render.delay_seconds, 0.5);
+    assert_eq!(config.render.pump_amount, 0.35);
+    assert_eq!(config.render.pump_release, 0.22);
     assert_eq!(config.render.drive, 1.3);
     assert_eq!(config.render.brightness, 1.4);
     assert_eq!(config.render.roughness, 0.7);

@@ -197,7 +197,7 @@ fn print_usage() {
     println!();
     println!("presets: {}", preset_names().join(", "));
     println!(
-        "render modes: percussive, impact-kit, drone, broken-radio, metallic, noise-organ, granular-dust, sub-machine, glass-harmonics"
+        "render modes: percussive, impact-kit, techno-pulse, drone, broken-radio, metallic, noise-organ, granular-dust, sub-machine, glass-harmonics"
     );
     println!();
     println!("examples:");

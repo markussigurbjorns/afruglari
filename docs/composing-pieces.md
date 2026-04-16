@@ -71,6 +71,8 @@ stereo_width = 0.8
 delay_mix = 0.15
 delay_feedback = 0.30
 delay_seconds = 0.37
+pump_amount = 0.25
+pump_release = 0.20
 drive = 1.2
 brightness = 1.0
 roughness = 1.2
@@ -167,6 +169,7 @@ Available render modes:
 ```text
 percussive
 impact-kit
+techno-pulse
 drone
 broken-radio
 metallic
@@ -181,6 +184,7 @@ General character:
 ```text
 percussive     short FM pulses, metallic hits, noisy clouds
 impact-kit     kick-like thumps, snare/noise bursts, and clanging metal hits
+techno-pulse   four-on-the-floor thumps, hats, and synthetic stabs
 drone          longer overlapping tones and unstable resonance
 broken-radio   gated noise, crushed signal, unstable synthetic radio
 metallic       inharmonic struck partials
@@ -204,6 +208,8 @@ stereo_width = 0.8
 delay_mix = 0.15
 delay_feedback = 0.30
 delay_seconds = 0.37
+pump_amount = 0.25
+pump_release = 0.20
 drive = 1.2
 brightness = 1.0
 roughness = 1.2
@@ -221,6 +227,8 @@ drive            tanh saturation amount before writing the WAV
 brightness       shifts resonators and carriers upward or downward
 roughness        increases noise, modulation, folding, and gating
 sustain          stretches event tails and envelope decay
+pump_amount      ducking depth of the simple master sidechain effect
+pump_release     how quickly the pump recovers after each trigger
 ```
 
 You can override the event-level render settings inside named sections:

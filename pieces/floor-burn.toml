@@ -1,0 +1,128 @@
+[piece]
+voices = 3
+steps = 24
+registers = 5
+timbres = 6
+intensities = 5
+seed = 744
+output = "target/pieces/floor-burn-744.wav"
+render_mode = "techno-pulse"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.18
+tail_seconds = 2.8
+stereo_width = 0.70
+delay_mix = 0.10
+delay_feedback = 0.18
+delay_seconds = 0.27
+drive = 1.34
+brightness = 0.94
+roughness = 1.18
+sustain = 0.82
+
+[[section]]
+name = "grid"
+start = 0
+end = 6
+
+[[section]]
+name = "drive"
+start = 6
+end = 14
+
+[[section]]
+name = "lift"
+start = 14
+end = 19
+
+[[section]]
+name = "release"
+start = 19
+end = 24
+
+[[voice_render]]
+voice = 0
+mode = "techno-pulse"
+brightness = 0.72
+roughness = 0.82
+sustain = 1.15
+
+[[voice_render]]
+voice = 1
+mode = "techno-pulse"
+brightness = 1.08
+roughness = 1.32
+sustain = 0.62
+
+[[voice_render]]
+voice = 2
+mode = "techno-pulse"
+brightness = 1.00
+roughness = 1.10
+sustain = 0.88
+
+[[section_render]]
+section = "grid"
+mode = "techno-pulse"
+brightness = 0.82
+roughness = 0.90
+sustain = 0.92
+
+[[section_render]]
+section = "drive"
+mode = "techno-pulse"
+brightness = 0.96
+roughness = 1.08
+sustain = 0.78
+
+[[section_render]]
+section = "lift"
+mode = "techno-pulse"
+brightness = 1.12
+roughness = 1.45
+sustain = 0.60
+drive = 1.42
+
+[[section_render]]
+section = "release"
+mode = "techno-pulse"
+brightness = 0.86
+roughness = 0.96
+sustain = 0.98
+
+[[constraint]]
+type = "exact-count"
+param = "active"
+value = true
+density = 0.33
+
+[[constraint]]
+type = "max-run"
+voice = 0
+param = "active"
+len = 3
+
+[[constraint]]
+type = "max-run"
+voice = 1
+param = "active"
+len = 3
+
+[[constraint]]
+type = "max-run"
+voice = 2
+param = "active"
+len = 2
+
+[[constraint]]
+type = "min-density-window"
+param = "active"
+window = 4
+min = 1
+
+[[constraint]]
+type = "slow-change"
+voice = 0
+param = "register"
+window = 3

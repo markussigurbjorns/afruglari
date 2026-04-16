@@ -372,6 +372,12 @@ impl GenerationConfig {
                 "render.delay_seconds" | "delay_seconds" => {
                     config.render.delay_seconds = parse_f32(value)?;
                 }
+                "render.pump_amount" | "pump_amount" => {
+                    config.render.pump_amount = parse_f32(value)?;
+                }
+                "render.pump_release" | "pump_release" => {
+                    config.render.pump_release = parse_f32(value)?;
+                }
                 "render.drive" | "drive" => {
                     config.render.drive = parse_f32(value)?;
                 }

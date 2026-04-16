@@ -236,6 +236,73 @@ pub(crate) fn render_impact_kit(
     }
 }
 
+pub(crate) fn render_techno_pulse(
+    samples: &mut [f32],
+    start: usize,
+    sample_rate: u32,
+    duration: f32,
+    register: u8,
+    timbre: f32,
+    amp: f32,
+    voice: usize,
+    tone: ToneControls,
+) {
+    let len = ((duration + 0.60 * tone.sustain) * sample_rate as f32) as usize;
+    let mut state = 0x4f1b_bc7d_u32
+        ^ start as u32
+        ^ ((voice as u32) << 11)
+        ^ ((register as u32) << 5)
+        ^ timbre as u32;
+
+    for i in 0..len {
+        let out = start + i;
+        if out >= samples.len() {
+            break;
+        }
+
+        let t = i as f32 / sample_rate as f32;
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let noise = ((state >> 8) as f32 / 16_777_216.0) * 2.0 - 1.0;
+
+        let value = match voice % 3 {
+            0 => {
+                let base = (42.0 + register as f32 * 5.0) * tone.brightness.max(0.4);
+                let pitch_drop = 1.0 + (-t * 34.0).exp() * (2.3 + timbre * 0.05);
+                let phase = t * base * pitch_drop * std::f32::consts::TAU;
+                let body = phase.sin();
+                let sub = (phase * 0.5).sin() * 0.55;
+                let click = (-t * 120.0).exp() * (noise + (t * 7_000.0).sin() * 0.25);
+                let env = (-t * (13.0 / tone.sustain)).exp();
+                (body + sub) * env * 1.35 + click * (0.16 + tone.roughness * 0.03)
+            }
+            1 => {
+                let hat_rate = 7_500.0 + timbre * 320.0 + tone.brightness * 900.0;
+                let ring = (t * hat_rate * std::f32::consts::TAU).sin().signum() * 0.12;
+                let gate = if ((t * (130.0 + timbre * 8.0)) as usize) % 2 == 0 {
+                    1.0
+                } else {
+                    0.35
+                };
+                let env = (-t * ((40.0 + timbre * 2.0) / tone.sustain)).exp();
+                (noise * (0.82 + tone.roughness * 0.14) + ring) * env * gate
+            }
+            _ => {
+                let stab_freq = (95.0 + register as f32 * 22.0 + timbre * 8.0) * tone.brightness;
+                let detune = 1.004 + tone.roughness * 0.0015;
+                let osc_a = (t * stab_freq * std::f32::consts::TAU).sin();
+                let osc_b = (t * stab_freq * detune * 1.99 * std::f32::consts::TAU).sin() * 0.48;
+                let chord = (osc_a + osc_b).tanh();
+                let filter = (t * stab_freq * 3.0 * std::f32::consts::TAU).sin() * 0.10;
+                let attack = (t / 0.01).min(1.0);
+                let env = attack * (-t * (7.5 / tone.sustain)).exp();
+                (chord + filter + noise * 0.04 * tone.roughness) * env * 0.95
+            }
+        };
+
+        samples[out] += value * amp;
+    }
+}
+
 pub(crate) fn render_broken_radio(
     samples: &mut [f32],
     start: usize,

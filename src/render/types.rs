@@ -8,6 +8,8 @@ pub struct RenderConfig {
     pub delay_mix: f32,
     pub delay_feedback: f32,
     pub delay_seconds: f32,
+    pub pump_amount: f32,
+    pub pump_release: f32,
     pub drive: f32,
     pub brightness: f32,
     pub roughness: f32,
@@ -41,6 +43,7 @@ pub struct RenderOverride {
 pub enum RenderMode {
     Percussive,
     ImpactKit,
+    TechnoPulse,
     Drone,
     BrokenRadio,
     Metallic,
@@ -54,6 +57,7 @@ pub fn parse_render_mode(name: &str) -> Option<RenderMode> {
     match name {
         "percussive" => Some(RenderMode::Percussive),
         "impact-kit" | "impact" | "kit" => Some(RenderMode::ImpactKit),
+        "techno-pulse" | "techno" | "pulse" => Some(RenderMode::TechnoPulse),
         "drone" => Some(RenderMode::Drone),
         "broken-radio" | "radio" => Some(RenderMode::BrokenRadio),
         "metallic" => Some(RenderMode::Metallic),
@@ -69,6 +73,7 @@ pub fn render_mode_name(mode: RenderMode) -> &'static str {
     match mode {
         RenderMode::Percussive => "percussive",
         RenderMode::ImpactKit => "impact-kit",
+        RenderMode::TechnoPulse => "techno-pulse",
         RenderMode::Drone => "drone",
         RenderMode::BrokenRadio => "broken-radio",
         RenderMode::Metallic => "metallic",
@@ -160,6 +165,8 @@ impl Default for RenderConfig {
             delay_mix: 0.12,
             delay_feedback: 0.28,
             delay_seconds: 0.33,
+            pump_amount: 0.0,
+            pump_release: 0.18,
             drive: 1.15,
             brightness: 1.0,
             roughness: 1.0,

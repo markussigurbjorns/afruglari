@@ -4,12 +4,12 @@ mod types;
 mod wav;
 
 use crate::grid::Event;
-use mix::{StereoSample, apply_delay, mix_mono_event, soft_limit, soft_limit_mono};
+use mix::{StereoSample, apply_delay, apply_pump, mix_mono_event, soft_limit, soft_limit_mono};
 use std::io;
 use synth::{
     ToneControls, render_broken_radio, render_drone, render_fm_pulse, render_glass_harmonics,
     render_granular_dust, render_impact_kit, render_metallic_hit, render_noise_cloud,
-    render_noise_organ, render_sub_machine,
+    render_noise_organ, render_sub_machine, render_techno_pulse,
 };
 pub use types::{
     RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, parse_render_mode,
@@ -56,6 +56,7 @@ pub fn render_events_to_wav_with_automation(
     }
 
     apply_delay(&mut samples, config);
+    apply_pump(&mut samples, config);
     soft_limit(&mut samples, config.drive);
     write_wav_stereo_i16(path, sample_rate, &samples)
 }
@@ -132,6 +133,17 @@ fn render_event(event: &Event, samples: &mut [StereoSample], config: RenderConfi
             tone,
         ),
         RenderMode::ImpactKit => render_impact_kit(
+            &mut mono,
+            0,
+            config.sample_rate,
+            duration,
+            register,
+            timbre,
+            amp,
+            event.voice,
+            tone,
+        ),
+        RenderMode::TechnoPulse => render_techno_pulse(
             &mut mono,
             0,
             config.sample_rate,

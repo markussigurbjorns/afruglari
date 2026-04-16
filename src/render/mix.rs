@@ -44,6 +44,26 @@ pub(crate) fn apply_delay(samples: &mut [StereoSample], config: RenderConfig) {
     }
 }
 
+pub(crate) fn apply_pump(samples: &mut [StereoSample], config: RenderConfig) {
+    let amount = config.pump_amount.clamp(0.0, 1.0);
+    if amount <= 0.0 {
+        return;
+    }
+
+    let release_seconds = config.pump_release.clamp(0.01, 2.0);
+    let release_coeff = (-1.0 / (release_seconds * config.sample_rate as f32)).exp();
+    let mut envelope = 0.0_f32;
+
+    for sample in samples {
+        let trigger = sample.left.abs().max(sample.right.abs()).min(1.0);
+        let target = trigger * trigger * amount;
+        envelope = (envelope * release_coeff).max(target);
+        let gain = (1.0 - envelope).clamp(0.05, 1.0);
+        sample.left *= gain;
+        sample.right *= gain;
+    }
+}
+
 pub(crate) fn soft_limit(samples: &mut [StereoSample], drive: f32) {
     let peak = samples
         .iter()
