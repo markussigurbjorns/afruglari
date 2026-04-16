@@ -216,6 +216,14 @@ pub struct Conflict {
     pub message: String,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SolveStats {
+    pub nodes: usize,
+    pub decisions: usize,
+    pub backtracks: usize,
+    pub max_depth: usize,
+}
+
 impl Conflict {
     pub(crate) fn new(message: impl Into<String>) -> Self {
         Self {
@@ -351,6 +359,10 @@ impl Engine {
     pub fn is_empty(&self) -> bool {
         self.domains.is_empty()
     }
+
+    pub fn constraint_count(&self) -> usize {
+        self.constraints.len()
+    }
 }
 
 pub fn solve(engine: &mut Engine) -> bool {
@@ -358,6 +370,24 @@ pub fn solve(engine: &mut Engine) -> bool {
 }
 
 pub fn solve_with_seed(engine: &mut Engine, seed: u64) -> bool {
+    solve_with_seed_and_stats(engine, seed).0
+}
+
+pub fn solve_with_seed_and_stats(engine: &mut Engine, seed: u64) -> (bool, SolveStats) {
+    let mut stats = SolveStats::default();
+    let solved = solve_with_seed_inner(engine, seed, 0, &mut stats);
+    (solved, stats)
+}
+
+fn solve_with_seed_inner(
+    engine: &mut Engine,
+    seed: u64,
+    depth: usize,
+    stats: &mut SolveStats,
+) -> bool {
+    stats.nodes += 1;
+    stats.max_depth = stats.max_depth.max(depth);
+
     if engine.propagate_all().is_err() {
         return false;
     }
@@ -366,13 +396,16 @@ pub fn solve_with_seed(engine: &mut Engine, seed: u64) -> bool {
     }
 
     let var = choose_var(engine, seed).expect("incomplete engine has a variable to choose");
+    stats.decisions += 1;
 
     for value in ordered_values(var, engine.domain(var), seed) {
         engine.push_level();
-        if engine.assign(var, value).is_ok() && solve_with_seed(engine, next_seed(seed, var, value))
+        if engine.assign(var, value).is_ok()
+            && solve_with_seed_inner(engine, next_seed(seed, var, value), depth + 1, stats)
         {
             return true;
         }
+        stats.backtracks += 1;
         engine.pop_level();
     }
 

@@ -11,7 +11,10 @@ pub use constraints::{
     AntiRepeatWindow, AtLeastCollisions, DifferentAdjacent, ExactCount, Implication, Literal,
     MaxCount, MaxRun, MinCount, MinDensityWindow, MoreTrueThan, PhaseResponse, SlowChange,
 };
-pub use csp::{Conflict, Constraint, Domain, Engine, Value, VarId, solve, solve_with_seed};
+pub use csp::{
+    Conflict, Constraint, Domain, Engine, SolveStats, Value, VarId, solve, solve_with_seed,
+    solve_with_seed_and_stats,
+};
 pub use grid::{
     Event, EventDurationMode, Grid, Param, events_from_grid, events_from_grid_with_durations,
 };
@@ -25,6 +28,6 @@ pub use render::{
 };
 pub use workflow::{
     ConstraintConfig, GenerateError, GenerateResult, GenerationConfig, PieceConfig, SectionConfig,
-    SectionRenderConfig, VoiceRenderConfig, generate_batch, generate_batch_from_config,
-    generate_from_config, generate_one,
+    SectionRenderConfig, SolverDiagnostics, VoiceRenderConfig, generate_batch,
+    generate_batch_from_config, generate_from_config, generate_one,
 };

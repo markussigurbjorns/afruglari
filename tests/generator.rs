@@ -472,6 +472,64 @@ fn config_parser_accepts_piece_and_render_sections() {
 }
 
 #[test]
+fn config_validation_rejects_duplicate_section_names() {
+    let error = afruglari::GenerationConfig::parse(
+        r#"
+        [piece]
+        steps = 12
+
+        [[section]]
+        name = "same"
+        start = 0
+        end = 4
+
+        [[section]]
+        name = "same"
+        start = 4
+        end = 8
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("duplicate section name"));
+}
+
+#[test]
+fn config_validation_rejects_out_of_range_voice_render() {
+    let error = afruglari::GenerationConfig::parse(
+        r#"
+        [piece]
+        voices = 2
+
+        [[voice_render]]
+        voice = 2
+        preset = "glass-insects"
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("voice_render references voice 2")
+    );
+}
+
+#[test]
+fn config_validation_rejects_unknown_render_preset_early() {
+    let error = afruglari::GenerationConfig::parse(
+        r#"
+        [[voice_render]]
+        voice = 0
+        preset = "not-a-preset"
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("unknown render preset"));
+}
+
+#[test]
 fn generate_one_writes_wav_and_metadata() {
     let base = std::env::temp_dir().join("afruglari-generate-one-test");
     let wav = base.with_extension("wav");

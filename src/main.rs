@@ -174,6 +174,7 @@ fn default_mode_for_preset(preset: PiecePreset) -> RenderMode {
 
 fn print_result(result: &afruglari::GenerateResult) {
     let metadata = &result.metadata;
+    let diagnostics = &result.diagnostics;
     println!(
         "piece={} seed={} mode={}",
         metadata.piece,
@@ -185,6 +186,16 @@ fn print_result(result: &afruglari::GenerateResult) {
     println!(
         "events={} collisions={} voice_density={:?}",
         metadata.events, metadata.collisions, metadata.voice_density
+    );
+    println!(
+        "solve vars={} constraints={} solve_ms={} nodes={} decisions={} backtracks={} max_depth={}",
+        diagnostics.variables,
+        diagnostics.constraints,
+        diagnostics.solve_ms,
+        diagnostics.nodes,
+        diagnostics.decisions,
+        diagnostics.backtracks,
+        diagnostics.max_depth
     );
 }
 

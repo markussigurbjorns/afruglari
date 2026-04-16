@@ -1,5 +1,5 @@
 use crate::builder::build_piece;
-use crate::csp::solve_with_seed;
+use crate::csp::{SolveStats, solve_with_seed_and_stats};
 use crate::grid::{Event, events_from_grid_with_durations};
 use crate::metadata::GenerationMetadata;
 use crate::presets::PiecePreset;
@@ -13,6 +13,7 @@ use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 #[derive(Clone, Debug)]
 pub struct GenerationConfig {
@@ -441,6 +442,7 @@ impl GenerationConfig {
             config.output = default_output_path(config.preset, config.seed);
         }
 
+        validate_config(&config)?;
         Ok(config)
     }
 }
@@ -448,13 +450,29 @@ impl GenerationConfig {
 #[derive(Clone, Debug)]
 pub struct GenerateResult {
     pub metadata: GenerationMetadata,
+    pub diagnostics: SolverDiagnostics,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SolverDiagnostics {
+    pub variables: usize,
+    pub constraints: usize,
+    pub solve_ms: u128,
+    pub nodes: usize,
+    pub decisions: usize,
+    pub backtracks: usize,
+    pub max_depth: usize,
 }
 
 #[derive(Debug)]
 pub enum GenerateError {
     Config(String),
     Io(io::Error),
-    NoSolution { piece: String, seed: u64 },
+    NoSolution {
+        piece: String,
+        seed: u64,
+        diagnostics: SolverDiagnostics,
+    },
 }
 
 impl fmt::Display for GenerateError {
@@ -462,8 +480,22 @@ impl fmt::Display for GenerateError {
         match self {
             Self::Config(message) => write!(f, "config error: {message}"),
             Self::Io(error) => write!(f, "io error: {error}"),
-            Self::NoSolution { piece, seed } => {
-                write!(f, "no solution for piece '{piece}' with seed {seed}")
+            Self::NoSolution {
+                piece,
+                seed,
+                diagnostics,
+            } => {
+                write!(
+                    f,
+                    "no solution for piece '{piece}' with seed {seed} (vars={}, constraints={}, solve_ms={}, nodes={}, decisions={}, backtracks={}, max_depth={})",
+                    diagnostics.variables,
+                    diagnostics.constraints,
+                    diagnostics.solve_ms,
+                    diagnostics.nodes,
+                    diagnostics.decisions,
+                    diagnostics.backtracks,
+                    diagnostics.max_depth
+                )
             }
         }
     }
@@ -483,12 +515,24 @@ pub fn generate_from_config(path: impl AsRef<Path>) -> Result<GenerateResult, Ge
 }
 
 pub fn generate_one(config: &GenerationConfig) -> Result<GenerateResult, GenerateError> {
+    validate_config(config)?;
     let (grid, mut engine) = build_piece(config)?;
+    let variables = engine.len();
+    let constraints = engine.constraint_count();
+    let started = Instant::now();
+    let (solved, solve_stats) = solve_with_seed_and_stats(&mut engine, config.seed);
+    let diagnostics = solver_diagnostics(
+        variables,
+        constraints,
+        started.elapsed().as_millis(),
+        solve_stats,
+    );
 
-    if !solve_with_seed(&mut engine, config.seed) {
+    if !solved {
         return Err(GenerateError::NoSolution {
             piece: piece_name(config).to_string(),
             seed: config.seed,
+            diagnostics,
         });
     }
 
@@ -517,7 +561,10 @@ pub fn generate_one(config: &GenerationConfig) -> Result<GenerateResult, Generat
     ensure_parent_dir(&metadata_path)?;
     fs::write(&metadata_path, metadata.to_json())?;
 
-    Ok(GenerateResult { metadata })
+    Ok(GenerateResult {
+        metadata,
+        diagnostics,
+    })
 }
 
 pub fn generate_batch(
@@ -589,6 +636,208 @@ fn resolve_render_voices(config: &GenerationConfig) -> Result<Vec<RenderVoice>, 
             })
         })
         .collect()
+}
+
+fn validate_config(config: &GenerationConfig) -> Result<(), GenerateError> {
+    let piece = config.piece.clone().unwrap_or_default();
+    validate_piece_shape(&piece)?;
+    validate_sections(&config.sections, piece.steps)?;
+    validate_render_references(config, piece.voices)?;
+    validate_constraint_references(config, piece.voices, piece.steps)?;
+    validate_render_values(config, piece.voices)?;
+    Ok(())
+}
+
+fn validate_piece_shape(piece: &PieceConfig) -> Result<(), GenerateError> {
+    if piece.voices == 0 {
+        return Err(GenerateError::Config(
+            "piece.voices must be greater than 0".to_string(),
+        ));
+    }
+    if piece.steps == 0 {
+        return Err(GenerateError::Config(
+            "piece.steps must be greater than 0".to_string(),
+        ));
+    }
+    if piece.registers == 0 || piece.timbres == 0 || piece.intensities == 0 {
+        return Err(GenerateError::Config(
+            "piece.registers, piece.timbres, and piece.intensities must be greater than 0"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_sections(sections: &[SectionConfig], steps: usize) -> Result<(), GenerateError> {
+    let mut seen = BTreeMap::new();
+    for section in sections {
+        if section.name.trim().is_empty() {
+            return Err(GenerateError::Config(
+                "section names must not be empty".to_string(),
+            ));
+        }
+        if section.start >= section.end {
+            return Err(GenerateError::Config(format!(
+                "section '{}' has invalid range {}..{}",
+                section.name, section.start, section.end
+            )));
+        }
+        if section.end > steps {
+            return Err(GenerateError::Config(format!(
+                "section '{}' ends at {}, beyond piece.steps={steps}",
+                section.name, section.end
+            )));
+        }
+        if seen.insert(section.name.clone(), ()).is_some() {
+            return Err(GenerateError::Config(format!(
+                "duplicate section name '{}'",
+                section.name
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_render_references(
+    config: &GenerationConfig,
+    voices: usize,
+) -> Result<(), GenerateError> {
+    for voice_render in &config.voice_renders {
+        if voice_render.voice >= voices {
+            return Err(GenerateError::Config(format!(
+                "voice_render references voice {} but piece has {voices} voices",
+                voice_render.voice
+            )));
+        }
+        if let Some(preset) = voice_render.preset.as_deref()
+            && render_preset(preset).is_none()
+        {
+            return Err(GenerateError::Config(format!(
+                "unknown render preset '{preset}'"
+            )));
+        }
+    }
+
+    for section_render in &config.section_renders {
+        if !config
+            .sections
+            .iter()
+            .any(|section| section.name == section_render.section)
+        {
+            return Err(GenerateError::Config(format!(
+                "section_render references unknown section '{}'",
+                section_render.section
+            )));
+        }
+        if let Some(preset) = section_render.preset.as_deref()
+            && render_preset(preset).is_none()
+        {
+            return Err(GenerateError::Config(format!(
+                "unknown render preset '{preset}'"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_constraint_references(
+    config: &GenerationConfig,
+    voices: usize,
+    steps: usize,
+) -> Result<(), GenerateError> {
+    for constraint in &config.constraints {
+        if let Some(section_name) = constraint.optional("section")
+            && !config
+                .sections
+                .iter()
+                .any(|section| section.name == section_name)
+        {
+            return Err(GenerateError::Config(format!(
+                "constraint references unknown section '{section_name}'"
+            )));
+        }
+
+        for key in [
+            "voice",
+            "voice_a",
+            "voice_b",
+            "left_voice",
+            "right_voice",
+            "a",
+            "b",
+        ] {
+            if let Some(value) = constraint.optional(key) {
+                let voice = parse_usize(value)?;
+                if voice >= voices {
+                    return Err(GenerateError::Config(format!(
+                        "constraint field '{key}' references voice {voice} but piece has {voices} voices"
+                    )));
+                }
+            }
+        }
+
+        for key in ["start", "end"] {
+            if let Some(value) = constraint.optional(key) {
+                let bound = parse_usize(value)?;
+                if bound > steps {
+                    return Err(GenerateError::Config(format!(
+                        "constraint field '{key}' references step {bound} but piece has {steps} steps"
+                    )));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_render_values(config: &GenerationConfig, voices: usize) -> Result<(), GenerateError> {
+    if config.render.sample_rate == 0 {
+        return Err(GenerateError::Config(
+            "render.sample_rate must be greater than 0".to_string(),
+        ));
+    }
+    if config.render.step_seconds <= 0.0 {
+        return Err(GenerateError::Config(
+            "render.step_seconds must be greater than 0".to_string(),
+        ));
+    }
+    if config.render.tail_seconds < 0.0 {
+        return Err(GenerateError::Config(
+            "render.tail_seconds must be non-negative".to_string(),
+        ));
+    }
+    if config.render.max_event_duration_steps == 0 {
+        return Err(GenerateError::Config(
+            "render.max_event_duration_steps must be greater than 0".to_string(),
+        ));
+    }
+    if let Some(voice) = config.render.pump_key_voice
+        && voice >= voices
+    {
+        return Err(GenerateError::Config(format!(
+            "render.pump_key_voice references voice {voice} but piece has {voices} voices"
+        )));
+    }
+    Ok(())
+}
+
+fn solver_diagnostics(
+    variables: usize,
+    constraints: usize,
+    solve_ms: u128,
+    stats: SolveStats,
+) -> SolverDiagnostics {
+    SolverDiagnostics {
+        variables,
+        constraints,
+        solve_ms,
+        nodes: stats.nodes,
+        decisions: stats.decisions,
+        backtracks: stats.backtracks,
+        max_depth: stats.max_depth,
+    }
 }
 
 fn resolve_render_sections(config: &GenerationConfig) -> Result<Vec<RenderSection>, GenerateError> {
