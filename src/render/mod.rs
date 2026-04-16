@@ -8,8 +8,8 @@ use mix::{StereoSample, apply_delay, mix_mono_event, soft_limit, soft_limit_mono
 use std::io;
 use synth::{
     ToneControls, render_broken_radio, render_drone, render_fm_pulse, render_glass_harmonics,
-    render_granular_dust, render_metallic_hit, render_noise_cloud, render_noise_organ,
-    render_sub_machine,
+    render_granular_dust, render_impact_kit, render_metallic_hit, render_noise_cloud,
+    render_noise_organ, render_sub_machine,
 };
 pub use types::{
     RenderConfig, RenderMode, RenderOverride, RenderSection, RenderVoice, parse_render_mode,
@@ -129,6 +129,17 @@ fn render_event(event: &Event, samples: &mut [StereoSample], config: RenderConfi
             register,
             timbre,
             amp,
+            tone,
+        ),
+        RenderMode::ImpactKit => render_impact_kit(
+            &mut mono,
+            0,
+            config.sample_rate,
+            duration,
+            register,
+            timbre,
+            amp,
+            event.voice,
             tone,
         ),
         RenderMode::BrokenRadio => render_broken_radio(

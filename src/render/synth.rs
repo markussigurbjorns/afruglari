@@ -160,6 +160,82 @@ pub(crate) fn render_drone(
     }
 }
 
+pub(crate) fn render_impact_kit(
+    samples: &mut [f32],
+    start: usize,
+    sample_rate: u32,
+    duration: f32,
+    register: u8,
+    timbre: f32,
+    amp: f32,
+    voice: usize,
+    tone: ToneControls,
+) {
+    let len = ((duration + 0.45 * tone.sustain) * sample_rate as f32) as usize;
+    let mut state = 0x51f2_ac91_u32
+        ^ start as u32
+        ^ ((voice as u32) << 9)
+        ^ ((register as u32) << 4)
+        ^ timbre as u32;
+
+    for i in 0..len {
+        let out = start + i;
+        if out >= samples.len() {
+            break;
+        }
+
+        let t = i as f32 / sample_rate as f32;
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        let noise = ((state & 0xffff) as f32 / 32_768.0) - 1.0;
+
+        let value = match voice % 3 {
+            0 => {
+                let base = (38.0 + register as f32 * 6.0) * tone.brightness.max(0.4);
+                let drop = 1.0 + (-t * 28.0).exp() * (1.8 + timbre * 0.08);
+                let phase = t * base * drop * std::f32::consts::TAU;
+                let body = phase.sin();
+                let sub = (phase * 0.5).sin() * 0.45;
+                let click = (-t * 85.0).exp() * noise * (0.18 + tone.roughness * 0.04);
+                let env = (-t * (11.0 / tone.sustain)).exp();
+                (body + sub) * env * 1.2 + click
+            }
+            1 => {
+                let ring = (220.0 + register as f32 * 55.0 + timbre * 12.0) * tone.brightness;
+                let wire = (t * ring * std::f32::consts::TAU).sin() * 0.28;
+                let grain = noise * (0.78 + tone.roughness * 0.18);
+                let gate = if ((t * (52.0 + timbre * 3.5)) as usize) % 2 == 0 {
+                    1.0
+                } else {
+                    0.55
+                };
+                let env = (-t * ((20.0 + timbre * 0.9) / tone.sustain)).exp();
+                (grain + wire) * env * gate
+            }
+            _ => {
+                let base = (170.0 + register as f32 * 68.0 + timbre * 18.0) * tone.brightness;
+                let partials = [
+                    1.0,
+                    1.41 + tone.roughness * 0.03,
+                    2.27 + timbre * 0.01,
+                    3.18 + tone.roughness * 0.05,
+                ];
+                let mut metal = 0.0_f32;
+                for (index, ratio) in partials.iter().enumerate() {
+                    metal += (t * base * ratio * std::f32::consts::TAU).sin()
+                        / (index as f32 + 1.0);
+                }
+                let scrape = noise * (-t * 34.0).exp() * (0.20 + tone.roughness * 0.06);
+                let env = (-t * ((9.0 + timbre * 0.5) / tone.sustain)).exp();
+                (metal * (1.0 + tone.roughness * 0.16)).sin() * env * 0.95 + scrape
+            }
+        };
+
+        samples[out] += value * amp;
+    }
+}
+
 pub(crate) fn render_broken_radio(
     samples: &mut [f32],
     start: usize,

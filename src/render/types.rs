@@ -40,6 +40,7 @@ pub struct RenderOverride {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RenderMode {
     Percussive,
+    ImpactKit,
     Drone,
     BrokenRadio,
     Metallic,
@@ -52,6 +53,7 @@ pub enum RenderMode {
 pub fn parse_render_mode(name: &str) -> Option<RenderMode> {
     match name {
         "percussive" => Some(RenderMode::Percussive),
+        "impact-kit" | "impact" | "kit" => Some(RenderMode::ImpactKit),
         "drone" => Some(RenderMode::Drone),
         "broken-radio" | "radio" => Some(RenderMode::BrokenRadio),
         "metallic" => Some(RenderMode::Metallic),
@@ -66,6 +68,7 @@ pub fn parse_render_mode(name: &str) -> Option<RenderMode> {
 pub fn render_mode_name(mode: RenderMode) -> &'static str {
     match mode {
         RenderMode::Percussive => "percussive",
+        RenderMode::ImpactKit => "impact-kit",
         RenderMode::Drone => "drone",
         RenderMode::BrokenRadio => "broken-radio",
         RenderMode::Metallic => "metallic",

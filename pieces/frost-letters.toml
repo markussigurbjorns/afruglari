@@ -1,0 +1,126 @@
+[piece]
+voices = 3
+steps = 36
+registers = 6
+timbres = 8
+intensities = 6
+seed = 411
+output = "target/pieces/frost-letters-411.wav"
+render_mode = "glass-harmonics"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.56
+tail_seconds = 6.2
+stereo_width = 0.96
+delay_mix = 0.18
+delay_feedback = 0.32
+delay_seconds = 0.51
+drive = 1.10
+brightness = 1.16
+roughness = 1.35
+sustain = 1.10
+
+[[section]]
+name = "vapor"
+start = 0
+end = 8
+
+[[section]]
+name = "etch"
+start = 8
+end = 18
+
+[[section]]
+name = "whiteout"
+start = 18
+end = 28
+
+[[section]]
+name = "trace"
+start = 28
+end = 36
+
+[[voice_render]]
+voice = 0
+preset = "glass-insects"
+brightness = 1.72
+sustain = 0.62
+
+[[voice_render]]
+voice = 1
+preset = "static-ash"
+roughness = 2.05
+sustain = 0.72
+
+[[voice_render]]
+voice = 2
+preset = "distant-drone"
+brightness = 0.46
+sustain = 4.80
+
+[[section_render]]
+section = "vapor"
+preset = "distant-drone"
+brightness = 0.42
+roughness = 0.55
+sustain = 5.20
+
+[[section_render]]
+section = "etch"
+preset = "glass-insects"
+brightness = 1.85
+roughness = 1.50
+sustain = 0.58
+
+[[section_render]]
+section = "whiteout"
+preset = "static-ash"
+brightness = 1.10
+roughness = 2.55
+sustain = 0.52
+drive = 1.32
+
+[[section_render]]
+section = "trace"
+preset = "distant-drone"
+brightness = 0.38
+roughness = 0.42
+sustain = 5.60
+
+[[constraint]]
+type = "exact-count"
+param = "active"
+value = true
+density = 0.16
+
+[[constraint]]
+type = "max-run"
+voice = 0
+param = "active"
+len = 2
+
+[[constraint]]
+type = "max-run"
+voice = 1
+param = "active"
+len = 1
+
+[[constraint]]
+type = "max-run"
+voice = 2
+param = "active"
+len = 2
+
+[[constraint]]
+type = "max-count"
+voice = 2
+param = "active"
+value = true
+count = 9
+
+[[constraint]]
+type = "min-density-window"
+param = "active"
+window = 9
+min = 1

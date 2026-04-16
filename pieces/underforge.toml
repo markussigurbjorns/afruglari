@@ -1,0 +1,138 @@
+[piece]
+voices = 3
+steps = 40
+registers = 6
+timbres = 8
+intensities = 6
+seed = 527
+output = "target/pieces/underforge-527.wav"
+render_mode = "sub-machine"
+
+[render]
+sample_rate = 44100
+step_seconds = 0.44
+tail_seconds = 5.0
+stereo_width = 0.72
+delay_mix = 0.17
+delay_feedback = 0.30
+delay_seconds = 0.39
+drive = 1.26
+brightness = 0.72
+roughness = 1.10
+sustain = 2.10
+
+[[section]]
+name = "approach"
+start = 0
+end = 10
+
+[[section]]
+name = "grind"
+start = 10
+end = 24
+
+[[section]]
+name = "press"
+start = 24
+end = 34
+
+[[section]]
+name = "smoke"
+start = 34
+end = 40
+
+[[voice_render]]
+voice = 0
+preset = "low-ritual"
+brightness = 0.66
+sustain = 3.10
+
+[[voice_render]]
+voice = 1
+preset = "buried-engine"
+roughness = 1.10
+sustain = 2.70
+
+[[voice_render]]
+voice = 2
+preset = "metal-splinters"
+brightness = 0.94
+roughness = 1.85
+sustain = 1.05
+
+[[section_render]]
+section = "approach"
+preset = "distant-drone"
+brightness = 0.45
+roughness = 0.55
+sustain = 4.40
+
+[[section_render]]
+section = "grind"
+preset = "low-ritual"
+brightness = 0.70
+roughness = 0.95
+sustain = 3.10
+
+[[section_render]]
+section = "press"
+preset = "buried-engine"
+brightness = 0.82
+roughness = 1.35
+sustain = 2.20
+drive = 1.36
+
+[[section_render]]
+section = "smoke"
+preset = "organ-fog"
+brightness = 0.58
+roughness = 0.75
+sustain = 3.90
+
+[[constraint]]
+type = "exact-count"
+param = "active"
+value = true
+density = 0.30
+
+[[constraint]]
+type = "max-run"
+voice = 0
+param = "active"
+len = 4
+
+[[constraint]]
+type = "max-run"
+voice = 1
+param = "active"
+len = 3
+
+[[constraint]]
+type = "max-run"
+voice = 2
+param = "active"
+len = 3
+
+[[constraint]]
+type = "min-density-window"
+param = "active"
+window = 8
+min = 1
+
+[[constraint]]
+type = "at-least-collisions"
+voice_a = 0
+voice_b = 1
+count = 4
+
+[[constraint]]
+type = "slow-change"
+voice = 0
+param = "register"
+window = 3
+
+[[constraint]]
+type = "slow-change"
+voice = 1
+param = "timbre"
+window = 3

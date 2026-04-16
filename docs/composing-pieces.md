@@ -166,6 +166,7 @@ Available render modes:
 
 ```text
 percussive
+impact-kit
 drone
 broken-radio
 metallic
@@ -179,6 +180,7 @@ General character:
 
 ```text
 percussive     short FM pulses, metallic hits, noisy clouds
+impact-kit     kick-like thumps, snare/noise bursts, and clanging metal hits
 drone          longer overlapping tones and unstable resonance
 broken-radio   gated noise, crushed signal, unstable synthetic radio
 metallic       inharmonic struck partials

@@ -238,6 +238,53 @@ fn renderer_writes_a_valid_wav_file() {
 }
 
 #[test]
+fn all_render_modes_write_valid_wav_files() {
+    let events = vec![Event {
+        voice: 1,
+        step: 0,
+        duration_steps: 1,
+        register: Some(2),
+        timbre: 4,
+        intensity: 5,
+    }];
+
+    for mode in [
+        RenderMode::Percussive,
+        RenderMode::ImpactKit,
+        RenderMode::Drone,
+        RenderMode::BrokenRadio,
+        RenderMode::Metallic,
+        RenderMode::NoiseOrgan,
+        RenderMode::GranularDust,
+        RenderMode::SubMachine,
+        RenderMode::GlassHarmonics,
+    ] {
+        let path = std::env::temp_dir().join(format!(
+            "afruglari-render-mode-{}.wav",
+            afruglari::render_mode_name(mode)
+        ));
+        render_events_to_wav(
+            &events,
+            &path,
+            RenderConfig {
+                sample_rate: 8_000,
+                step_seconds: 0.04,
+                tail_seconds: 0.04,
+                mode,
+                ..RenderConfig::default()
+            },
+        )
+        .unwrap();
+
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[0..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        assert!(bytes.len() > 44, "{mode:?} produced no audio payload");
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+#[test]
 fn all_presets_solve_with_seeded_search() {
     for preset in [
         PiecePreset::Example,
