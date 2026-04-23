@@ -1,0 +1,8 @@
+section section_1 duration=16 mode=hold root=110 voices=3 octave_min=1 octave_max=2 event_attack_min=0.015 event_attack_max=0.195 event_decay_min=2 event_decay_max=8 drone_retune_seconds=9 density=0.35 brightness=0.45 space=0.65 instability=0.25 drone_spread=1 drone_detune=1 harmonic_mix=1 harmonic_shimmer=1 pulse_rate=1 pulse_length=1 noise_motion=1 sample_auto_rate=1 texture_drift=1
+instrument drone level=0 active=0
+instrument harmonic level=0 active=0
+instrument pulse level=0 active=0
+instrument sample level=0 active=0
+instrument noise level=0 active=0
+instrument events level=0 active=0
+instrument texture level=0

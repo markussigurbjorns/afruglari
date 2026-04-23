@@ -1,0 +1,17 @@
+# First timeline piece for Drone Garden.
+# Shape:
+# - quiet opening drone
+# - gradual air and texture bloom
+# - sparse event foreground
+# - wider, darker suspended middle
+# - slow reduction into a soft tape-heavy ending
+
+0 root=110.00 voices=3 octave_min=1 octave_max=2 event_attack_min=0.02 event_attack_max=0.10 event_decay_min=2.0 event_decay_max=5.0 drone_retune_seconds=14.0 density=0.18 brightness=0.30 space=0.58 instability=0.12 drone=0.95 noise=0.04 events=0.00 texture=0.00
+45 density=0.24 brightness=0.34 space=0.64 instability=0.16 noise=0.08 texture=0.10
+105 root=98.00 voices=4 octave_min=1 octave_max=3 event_attack_min=0.03 event_attack_max=0.16 event_decay_min=3.0 event_decay_max=7.0 drone_retune_seconds=9.0 density=0.32 brightness=0.40 space=0.72 instability=0.21 noise=0.14 events=0.10 texture=0.22
+180 density=0.42 brightness=0.46 space=0.82 instability=0.28 drone=0.92 noise=0.20 events=0.22 texture=0.36
+270 root=82.41 voices=5 octave_min=2 octave_max=4 event_attack_min=0.08 event_attack_max=0.30 event_decay_min=5.0 event_decay_max=11.0 drone_retune_seconds=4.0 density=0.50 brightness=0.42 space=0.90 instability=0.36 drone=0.84 noise=0.24 events=0.32 texture=0.52
+360 density=0.44 brightness=0.32 space=0.94 instability=0.31 drone=0.76 noise=0.20 events=0.16 texture=0.68
+465 root=73.42 voices=3 octave_min=1 octave_max=2 event_attack_min=0.14 event_attack_max=0.45 event_decay_min=7.0 event_decay_max=14.0 drone_retune_seconds=10.0 density=0.30 brightness=0.24 space=0.97 instability=0.24 drone=0.60 noise=0.13 events=0.06 texture=0.78
+570 density=0.20 brightness=0.18 space=0.98 instability=0.16 drone=0.48 noise=0.07 events=0.00 texture=0.86
+660 root=55.00 voices=2 octave_min=0 octave_max=1 event_attack_min=0.22 event_attack_max=0.70 event_decay_min=9.0 event_decay_max=18.0 drone_retune_seconds=22.0 density=0.12 brightness=0.14 space=1.00 instability=0.10 drone=0.34 noise=0.03 texture=0.92
